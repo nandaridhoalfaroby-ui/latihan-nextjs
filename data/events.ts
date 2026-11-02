@@ -70,6 +70,16 @@ export const events: Event[] = [
     kuota: 60,
     terisi: 18,
   },
+  {
+  id: 7,
+    judul: "Lomba Desain Poster",
+    kategori: "Lomba",
+    tanggal: "2025-06-20",
+    lokasi: "Lab RPL",
+    harga: 0,
+    kuota: 50,
+    terisi: 30
+  }
 ];
 
 export function rupiah(n: number) {
