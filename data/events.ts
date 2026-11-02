@@ -1,4 +1,6 @@
 export type Event = {
+  deskripsi: ReactNode;
+  nama: ReactNode;
   id: number;
   judul: string;
   kategori: string;
