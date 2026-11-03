@@ -1,9 +1,9 @@
 "use client";
-
 import { useState } from "react";
 import KartuEvent from "./KartuEvent";
+import { type Event } from "@/data/events";
 
-export default function KatalogInteraktif({ events }: { events: any[] }) {
+export default function KatalogInteraktif({ events }: { events: Event[] }) {
   const [keyword, setKeyword] = useState("");
   const [hanyaAdaTiket, setHanyaAdaTiket] = useState(false);
 
