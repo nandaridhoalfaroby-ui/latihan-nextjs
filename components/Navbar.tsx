@@ -1,3 +1,4 @@
+
 "use client";
 
 import Link from "next/link";
@@ -12,9 +13,16 @@ const menu = [
 
 export default function Navbar() {
   const pathname = usePathname();
+
   return (
     <nav className="flex items-center gap-4 border-b bg-white px-4 py-3">
-      <span className="text-lg font-bold text-blue-600">EventKu</span>
+      <Link
+        href="/"
+        className="text-lg font-bold text-blue-600"
+      >
+        EventKu
+      </Link>
+
       {menu.map((m) => (
         <Link
           key={m.href}
