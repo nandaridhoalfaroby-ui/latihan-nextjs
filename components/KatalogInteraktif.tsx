@@ -9,6 +9,7 @@ export default function KatalogInteraktif({ events }: { events: Event[] }) {
   const [urut, setUrut] = useState<"tanggal" | "harga" | "nama">("tanggal");
 
   const daftarKategori = ["Semua", ...new Set(events.map((e) => e.kategori))];
+  
   const hasil = events.filter(
     (e) =>
       e.judul.toLowerCase().includes(cari.toLowerCase()) &&
@@ -20,6 +21,11 @@ export default function KatalogInteraktif({ events }: { events: Event[] }) {
     if (urut === "harga") return a.harga - b.harga;
     return a.tanggal.localeCompare(b.tanggal);
   });
+
+  // === STATISTIK BARU LANGKAH 5 ===
+  const totalHarga = terurut.reduce((sum, e) => sum + e.harga, 0);
+  const rataRata = terurut.length > 0 ? totalHarga / terurut.length : 0;
+  const totalSisa = terurut.reduce((sum, e) => sum + (e.kuota - e.terisi), 0);
 
   return (
     <div>
@@ -49,7 +55,14 @@ export default function KatalogInteraktif({ events }: { events: Event[] }) {
           <option value="nama">nama A-Z</option>
         </select>
       </div>
-      <p className="mb-3 text-sm text-slate-500">{terurut.length} event ditemu (terurut ...)</p>
+
+      <p className="mb-1 text-sm text-slate-500">
+        {terurut.length} event ditemu (terurut {urut})
+      </p>
+      <p className="mb-3 text-sm font-medium text-slate-700">
+        Rata-rata harga {rupiah(rataRata)} · Total sisa tiket {totalSisa}
+      </p>
+
       {terurut.length === 0 ? (
         <p className="text-slate-500">Tidak ada event yang cocok.</p>
       ) : (
