@@ -1,50 +1,64 @@
 "use client";
 import { useState } from "react";
+import { rupiah, type Event } from "@/data/events";
 import KartuEvent from "./KartuEvent";
-import { type Event } from "@/data/events";
 
 export default function KatalogInteraktif({ events }: { events: Event[] }) {
-  const [keyword, setKeyword] = useState("");
-  const [hanyaAdaTiket, setHanyaAdaTiket] = useState(false);
+  const [cari, setCari] = useState("");
+  const [kategori, setKategori] = useState("Semua");
+  const [urut, setUrut] = useState<"tanggal" | "harga" | "nama">("tanggal");
 
-  const filtered = events.filter((e) => {
-    // biar gak error toLowerCase kalau e.nama undefined
-    const nama = (e.nama || e.title || "").toLowerCase();
-    const kata = keyword.toLowerCase();
-    const cocokCari = nama.includes(kata);
+  const daftarKategori = ["Semua", ...new Set(events.map((e) => e.kategori))];
+  const hasil = events.filter(
+    (e) =>
+      e.judul.toLowerCase().includes(cari.toLowerCase()) &&
+      (kategori === "Semua" || e.kategori === kategori)
+  );
 
-    // kuota habis = kuota - terisi <= 0 atau kuota === 0
-    // sesuaikan sama field di data kamu
-    const sisa = e.sisa ?? (e.kuota - (e.terisi ?? 0));
-    const cocokTiket = hanyaAdaTiket ? sisa > 0 : true;
-
-    return cocokCari && cocokTiket;
+  const terurut = [...hasil].sort((a, b) => {
+    if (urut === "nama") return a.judul.localeCompare(b.judul);
+    if (urut === "harga") return a.harga - b.harga;
+    return a.tanggal.localeCompare(b.tanggal);
   });
 
   return (
     <div>
-      <input
-        type="text"
-        placeholder="Cari event..."
-        value={keyword}
-        onChange={(e) => setKeyword(e.target.value)}
-        className="mb-4 w-full rounded border px-3 py-2"
-      />
-
-      <label className="mb-4 flex items-center gap-2">
+      <div className="mb-4 flex flex-wrap gap-3">
         <input
-          type="checkbox"
-          checked={hanyaAdaTiket}
-          onChange={(e) => setHanyaAdaTiket(e.target.checked)}
+          value={cari}
+          onChange={(e) => setCari(e.target.value)}
+          placeholder="Cari event..."
+          className="rounded border bg-white px-3 py-2"
         />
-        <span>Hanya yang masih ada tiket</span>
-      </label>
-
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {filtered.map((e) => (
-          <KartuEvent key={e.id} event={e} />
-        ))}
+        <select
+          value={kategori}
+          onChange={(e) => setKategori(e.target.value)}
+          className="rounded border bg-white px-3 py-2"
+        >
+          {daftarKategori.map((k) => (
+            <option key={k}>{k}</option>
+          ))}
+        </select>
+        <select
+          value={urut}
+          onChange={(e) => setUrut(e.target.value as any)}
+          className="rounded border bg-white px-3 py-2"
+        >
+          <option value="tanggal">terdekat</option>
+          <option value="harga">termurah</option>
+          <option value="nama">nama A-Z</option>
+        </select>
       </div>
+      <p className="mb-3 text-sm text-slate-500">{terurut.length} event ditemu (terurut ...)</p>
+      {terurut.length === 0 ? (
+        <p className="text-slate-500">Tidak ada event yang cocok.</p>
+      ) : (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {terurut.map((e) => (
+            <KartuEvent key={e.id} event={e} />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
