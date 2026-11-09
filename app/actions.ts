@@ -10,13 +10,15 @@ export type HasilPesan = {
 };
 
 export async function pesanTiket(_sebelum: HasilPesan, formData: FormData): Promise<HasilPesan> {
-  // pura-pura server sedang sibuk, supaya tombol "Memproses..." terlihat
-  await new Promise((r) => setTimeout(r, 800));
-
   const eventId = Number(formData.get("eventId"));
   const nama = String(formData.get("nama") ?? "").trim();
   const email = String(formData.get("email") ?? "").trim();
   const jumlah = Number(formData.get("jumlah"));
+
+  console.log("Pesanan masuk:", nama, jumlah);
+
+  // pura-pura server sedang sibuk, supaya tombol "Memproses..." terlihat
+  await new Promise((r) => setTimeout(r, 800));
 
   const event = events.find((e: { id: number; }) => e.id === eventId);
   if (!event) {
