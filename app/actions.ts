@@ -27,6 +27,7 @@ export async function pesanTiket(_sebelum: HasilPesan, formData: FormData): Prom
 
   const galat = { nama: "", email: "", jumlah: "" };
   if (nama.length < 3) galat.nama = "Nama minimal 3 huruf.";
+  else if (nama.length > 40) galat.nama = "Nama maksimal 40 huruf.";
   if (email.length < 3 || !email.includes("@")) galat.email = "Email tidak valid.";
   if (jumlah < 1) galat.jumlah = "Jumlah minimal 1.";
   else if (jumlah > event.sisa) galat.jumlah = "Jumlah tidak boleh lebih dari sisa tiket.";
