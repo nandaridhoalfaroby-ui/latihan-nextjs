@@ -7,7 +7,9 @@ export default function NotFound() {
         🎪
       </div>
 
-      <h1 className="mt-6 text-6xl font-black tracking-tight text-zinc-900">404</h1>
+      <h1 className="mt-6 text-6xl font-black tracking-tight text-zinc-900">
+        404
+      </h1>
       <p className="mt-2 text-sm font-bold text-zinc-600">
         Yah, halaman yang kamu cari tidak ada.
       </p>
@@ -16,14 +18,14 @@ export default function NotFound() {
       </p>
 
       <div className="mt-8 flex flex-wrap justify-center gap-3">
-        <Link 
-          href="/" 
+        <Link
+          href="/"
           className="inline-flex items-center rounded-full bg-[#FFC837] border-2 border-amber-300 px-7 py-3 text-sm font-black text-zinc-900 shadow-md hover:bg-[#FFD95E] hover:-translate-y-0.5 transition-all"
         >
           ← Kembali ke beranda
         </Link>
-        <Link 
-          href="/event" 
+        <Link
+          href="/event"
           className="inline-flex items-center rounded-full bg-[#FFFEF7] border border-orange-100 px-7 py-3 text-sm font-black text-zinc-900 hover:bg-white transition"
         >
           Lihat Event
