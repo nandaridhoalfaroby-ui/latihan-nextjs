@@ -2,10 +2,15 @@ import Link from "next/link";
 import { rupiah, type Event } from "@/data/events";
 
 export default function KartuEvent({ event }: { event: Event }) {
-  const sisa = event.kuota - event.terisi;
+  // AMAN BUAT 2 SKEMA - baru (sisa/kapasitas) & lama (kuota/terisi)
+  const e = event as Event & { kuota?: number; terisi?: number };
+  const sisa = typeof e.sisa === "number" ? e.sisa : (e.kuota ?? 0) - (e.terisi ?? 0);
+  const kapasitas = typeof e.kapasitas === "number" ? e.kapasitas : (e.kuota ?? 1);
+  const terisi = kapasitas - sisa;
+  const persen = kapasitas > 0 ? Math.round((terisi / kapasitas) * 100) : 0;
+
   const habis = sisa === 0;
-  const laris = sisa > 0 && event.terisi / event.kuota > 0.8;
-  const persen = Math.round((event.terisi / event.kuota) * 100);
+  const laris = sisa > 0 && persen > 80;
 
   return (
     <div className={`group relative flex flex-col rounded- border p-5 transition-all hover:-translate-y-1 hover:shadow-md ${
@@ -13,7 +18,6 @@ export default function KartuEvent({ event }: { event: Event }) {
         ? "bg-[#F3EEE2] border-orange-100 opacity-80" 
         : "bg-[#FFFEF7] border-orange-100"
     }`}>
-      {/* Badge row */}
       <div className="flex items-center gap-2">
         <span className="inline-flex rounded-full bg-[#FFFBEB] border border-orange-100 px-3 py-1 text- font-black tracking-wide text-zinc-700">
           {event.kategori}
@@ -39,7 +43,6 @@ export default function KartuEvent({ event }: { event: Event }) {
 
       <p className="mt-4 text-xl font-black text-zinc-900">{rupiah(event.harga)}</p>
 
-      {/* Progress tiket */}
       <div className="mt-3">
         <div className="flex items-center justify-between text- font-bold">
           <span className={habis ? "text-red-700" : "text-emerald-700"}>
@@ -57,13 +60,9 @@ export default function KartuEvent({ event }: { event: Event }) {
 
       <Link
         href={`/event/${event.id}`}
-        className={`mt-5 block text-center rounded-full py-2.5 text-sm font-black transition-all ${
-          habis
-            ? "bg-[#E9E2CE] border border-orange-100 text-zinc-500 cursor-not-allowed"
-            : "bg-[#FFC837] border-2 border-amber-300 text-zinc-900 shadow-sm hover:bg-[#FFD95E]"
-        }`}
+        className="mt-5 block text-center rounded-full py-2.5 text-sm font-black transition-all bg-[#FFC837] border-2 border-amber-300 text-zinc-900 shadow-sm hover:bg-[#FFD95E]"
       >
-        {habis ? "Lihat Detail" : "Lihat Detail →"}
+        Lihat Detail →
       </Link>
     </div>
   );

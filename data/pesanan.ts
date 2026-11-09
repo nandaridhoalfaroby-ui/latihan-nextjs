@@ -1,4 +1,3 @@
-// data/pesanan.ts
 export type Pesanan = {
   nomor: number;
   eventId: number;
@@ -10,9 +9,7 @@ export type Pesanan = {
   waktu: string;
 };
 
-// Disimpan di memori server: hilang setiap kali server dimatikan.
 export const pesanan: Pesanan[] = [];
-
 let nomorTerakhir = 0;
 
 export function tambahPesanan(data: Omit<Pesanan, "nomor">) {

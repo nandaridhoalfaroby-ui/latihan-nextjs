@@ -1,5 +1,5 @@
-// app/actions.ts
 "use server";
+import { revalidatePath } from "next/cache";
 import { events } from "@/data/events";
 import { tambahPesanan } from "@/data/pesanan";
 
@@ -15,12 +15,9 @@ export async function pesanTiket(_sebelum: HasilPesan, formData: FormData): Prom
   const email = String(formData.get("email") ?? "").trim();
   const jumlah = Number(formData.get("jumlah"));
 
-  console.log("Pesanan masuk:", nama, jumlah);
-
-  // pura-pura server sedang sibuk, supaya tombol "Memproses..." terlihat
   await new Promise((r) => setTimeout(r, 800));
 
-  const event = events.find((e: { id: number; }) => e.id === eventId);
+  const event = events.find((e) => e.id === eventId);
   if (!event) {
     return { berhasil: false, pesan: "Event tidak ditemukan", galat: { nama: "", email: "", jumlah: "" } };
   }
@@ -37,15 +34,18 @@ export async function pesanTiket(_sebelum: HasilPesan, formData: FormData): Prom
   }
 
   const total = event.harga * jumlah;
+
+  // INI YANG BIKIN SISA BERUBAH
+  event.sisa -= jumlah;
+
   const nomor = tambahPesanan({
-    eventId,
-    judul: event.judul,
-    nama,
-    email,
-    jumlah,
-    total,
+    eventId, judul: event.judul, nama, email, jumlah, total,
     waktu: new Date().toISOString().split("T")[0],
   });
+
+  revalidatePath("/event");
+  revalidatePath(`/event/${eventId}`);
+  revalidatePath("/pesanan");
 
   return {
     berhasil: true,

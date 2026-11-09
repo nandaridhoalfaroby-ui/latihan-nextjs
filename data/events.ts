@@ -1,43 +1,24 @@
-// data/events.ts - VERSI FIX BUILD
-
 export type Event = {
   id: number;
   judul: string;
-  nama: string;
-  title: string;
-  name?: string;
   kategori: string;
   tanggal: string;
   lokasi: string;
   harga: number;
-  kuota: number;
-  terisi: number;
   sisa: number;
+  kapasitas: number;
   deskripsi: string;
-  namaEvent?: string;
 };
 
-function makeEvent(e: Omit<Event, 'nama' | 'title' | 'deskripsi' | 'sisa'> & { judul: string }): Event {
-  return {
-    ...e,
-    nama: e.judul,
-    title: e.judul,
-    name: e.judul,
-    namaEvent: e.judul,
-    deskripsi: `${e.judul} - ${e.kategori} di ${e.lokasi}`,
-    sisa: e.kuota - e.terisi,
-  };
-}
-
 export const events: Event[] = [
-  makeEvent({ id: 1, judul: "Workshop React untuk Pemula", kategori: "Workshop", tanggal: "2026-11-14", lokasi: "Lab RPL", harga: 50000, kuota: 30, terisi: 12 }),
-  makeEvent({ id: 2, judul: "Turnamen Futsal", kategori: "Olahraga", tanggal: "2026-11-15", lokasi: "Lapangan Sekolah", harga: 0, kuota: 16, terisi: 16 }),
-  makeEvent({ id: 3, judul: "Lomba Desain Poster", kategori: "Lomba", tanggal: "2026-11-16", lokasi: "Aula", harga: 25000, kuota: 20, terisi: 5 }),
-  makeEvent({ id: 4, judul: "Bazar Kewirausahaan", kategori: "Bazar", tanggal: "2026-11-17", lokasi: "Halaman Sekolah", harga: 0, kuota: 50, terisi: 20 }),
-  makeEvent({ id: 5, judul: "Konser Musik Akustik", kategori: "Musik", tanggal: "2026-11-18", lokasi: "Aula", harga: 35000, kuota: 100, terisi: 60 }),
-  makeEvent({ id: 6, judul: "Seminar Karir IT", kategori: "Seminar", tanggal: "2026-11-19", lokasi: "Lab RPL", harga: 0, kuota: 40, terisi: 10 }),
-].map(e => ({ ...e, sisa: e.kuota - e.terisi }));
+  { id: 1, judul: "Workshop React untuk Pemula", kategori: "Workshop", tanggal: "2026-11-14", lokasi: "Lab RPL", harga: 50000, sisa: 18, kapasitas: 30, deskripsi: "Jangan sampai kehabisan. Pesan sekarang, e-ticket langsung dikirim ke email lo." },
+  { id: 2, judul: "Turnamen Futsal", kategori: "Olahraga", tanggal: "2026-11-20", lokasi: "Lapangan Sekolah", harga: 0, sisa: 0, kapasitas: 50, deskripsi: "Turnamen futsal antar kelas." },
+  { id: 3, judul: "Seminar AI", kategori: "Seminar", tanggal: "2026-11-22", lokasi: "Aula", harga: 25000, sisa: 25, kapasitas: 40, deskripsi: "Seminar AI untuk pemula." },
+  { id: 4, judul: "Pameran Seni", kategori: "Seni", tanggal: "2026-11-25", lokasi: "Gedung Serbaguna", harga: 10000, sisa: 40, kapasitas: 60, deskripsi: "Pameran karya seni siswa." },
+  { id: 5, judul: "Lomba Coding", kategori: "Lomba", tanggal: "2026-11-28", lokasi: "Lab RPL", harga: 15000, sisa: 12, kapasitas: 20, deskripsi: "Lomba coding antar jurusan." },
+  { id: 6, judul: "Bazar Sekolah", kategori: "Bazar", tanggal: "2026-12-01", lokasi: "Halaman Sekolah", harga: 5000, sisa: 100, kapasitas: 200, deskripsi: "Bazar makanan dan kerajinan." },
+];
 
 export function rupiah(n: number) {
-  return new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }).format(n);
+  return "Rp " + n.toLocaleString("id-ID");
 }

@@ -4,6 +4,13 @@ import { rupiah, type Event } from "@/data/events";
 import KartuEvent from "./KartuEvent";
 import KontrolKatalog from "./KontrolKatalog";
 
+// Biar aman kalau ada event yang masih pake kuota/terisi lama
+function getSisa(e: Event & { kuota?: number; terisi?: number }) {
+  if (typeof e.sisa === "number") return e.sisa;
+  if (typeof e.kuota === "number" && typeof e.terisi === "number") return e.kuota - e.terisi;
+  return 0;
+}
+
 export default function KatalogInteraktif({ events }: { events: Event[] }) {
   const [cari, setCari] = useState("");
   const [kategori, setKategori] = useState("Semua");
@@ -24,7 +31,7 @@ export default function KatalogInteraktif({ events }: { events: Event[] }) {
   const hasil = events.filter((e) => {
     const cocokCari = e.judul.toLowerCase().includes(cari.toLowerCase());
     const cocokKategori = kategori === "Semua" || e.kategori === kategori;
-    const cocokTersedia = !hanyaTersedia || (e.kuota - e.terisi) > 0;
+    const cocokTersedia = !hanyaTersedia || getSisa(e) > 0;
     const cocokHarga = hargaMaks === "" || e.harga <= Number(hargaMaks);
     return cocokCari && cocokKategori && cocokTersedia && cocokHarga;
   });
@@ -35,7 +42,7 @@ export default function KatalogInteraktif({ events }: { events: Event[] }) {
   });
   const totalHarga = terurut.reduce((s, e) => s + e.harga, 0);
   const rataRata = terurut.length > 0 ? totalHarga / terurut.length : 0;
-  const totalSisa = terurut.reduce((s, e) => s + (e.kuota - e.terisi), 0);
+  const totalSisa = terurut.reduce((s, e) => s + getSisa(e), 0);
   useEffect(() => { setTampil(4); }, [cari, kategori, urut, hanyaTersedia, hargaMaks]);
 
   const ditampilkan = terurut.slice(0, tampil);
@@ -52,7 +59,6 @@ export default function KatalogInteraktif({ events }: { events: Event[] }) {
         hargaMaks={hargaMaks} setHargaMaks={setHargaMaks}
       />
 
-      {/* STATS BAR - TANPA TULISAN PUTIH */}
       <div className="mb-5 flex flex-wrap items-center gap-3">
         <span className="inline-flex items-center gap-1.5 rounded-full bg-[#FFFEF7] border border-orange-100 px-3.5 py-1.5 text-xs font-black text-zinc-900 shadow-sm">
           🎟️ <span>{terurut.length} event ditemu</span>
