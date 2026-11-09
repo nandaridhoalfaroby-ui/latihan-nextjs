@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { events } from "@/data/events";
-import { tambahPesanan } from "@/data/pesanan";
+import { pesanan, tambahPesanan } from "@/data/pesanan";
 
 export type HasilPesan = {
   berhasil: boolean;
@@ -43,7 +43,6 @@ export async function pesanTiket(_sebelum: HasilPesan, formData: FormData): Prom
     waktu: new Date().toISOString().split("T")[0],
   });
 
-  // BARU - Langkah 5: simpan nama ke cookie 30 hari
   const toples = await cookies();
   toples.set("nama", nama, { maxAge: 60 * 60 * 24 * 30 });
 
@@ -56,4 +55,23 @@ export async function pesanTiket(_sebelum: HasilPesan, formData: FormData): Prom
     pesan: `Pesanan #${nomor} berhasil: ${jumlah} tiket untuk ${event.judul}.`,
     galat: { nama: "", email: "", jumlah: "" },
   };
+}
+
+// BARU - Langkah 7
+export async function batalkanPesanan(formData: FormData) {
+  const namaSaya = (await cookies()).get("nama")?.value;
+  const nomor = Number(formData.get("nomor"));
+
+  // Jangan percaya browser: periksa lagi di server bahwa ini pesanan miliknya
+  const idx = pesanan.findIndex((p) => p.nomor === nomor);
+  if (idx < 0) return;
+  if (pesanan[idx].nama !== namaSaya) return; // bukan miliknya, tolak diam-diam
+
+  const [batal] = pesanan.splice(idx, 1);
+  const event = events.find((e) => e.id === batal.eventId);
+  if (event) event.sisa += batal.jumlah;
+
+  revalidatePath("/event");
+  revalidatePath(`/event/${batal.eventId}`);
+  revalidatePath("/pesanan");
 }
