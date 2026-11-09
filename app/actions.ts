@@ -1,5 +1,7 @@
+// app/actions.ts
 "use server";
 import { revalidatePath } from "next/cache";
+import { cookies } from "next/headers";
 import { events } from "@/data/events";
 import { tambahPesanan } from "@/data/pesanan";
 
@@ -34,14 +36,16 @@ export async function pesanTiket(_sebelum: HasilPesan, formData: FormData): Prom
   }
 
   const total = event.harga * jumlah;
-
-  // INI YANG BIKIN SISA BERUBAH
   event.sisa -= jumlah;
 
   const nomor = tambahPesanan({
     eventId, judul: event.judul, nama, email, jumlah, total,
     waktu: new Date().toISOString().split("T")[0],
   });
+
+  // BARU - Langkah 5: simpan nama ke cookie 30 hari
+  const toples = await cookies();
+  toples.set("nama", nama, { maxAge: 60 * 60 * 24 * 30 });
 
   revalidatePath("/event");
   revalidatePath(`/event/${eventId}`);

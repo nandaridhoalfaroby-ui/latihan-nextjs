@@ -1,5 +1,6 @@
 import { events, rupiah } from "@/data/events";
 import { notFound } from "next/navigation";
+import { cookies } from "next/headers";
 import FormPesan from "@/components/FormPesan";
 import TombolFavorit from "@/components/TombolFavorit";
 import Link from "next/link";
@@ -8,6 +9,9 @@ export default async function DetailPage({ params }: { params: Promise<{ id: str
   const { id } = await params;
   const event = events.find((e) => String(e.id) === id);
   if (!event) notFound();
+
+  // BARU - baca cookie
+  const namaAwal = (await cookies()).get("nama")?.value ?? "";
 
   const terisi = Math.round(((event.kapasitas - event.sisa) / event.kapasitas) * 100);
   const laris = event.sisa > 0 && terisi > 80;
@@ -23,9 +27,17 @@ export default async function DetailPage({ params }: { params: Promise<{ id: str
             {laris && <span className="rounded-full bg-[#FFC837] border border-amber-300 px-3 py-1 text- font-black text-zinc-900">🔥 Laris</span>}
             <span className={`rounded-full border px-3 py-1 text- font-black ${habis ? "bg-[#FFE4E6] border-red-200 text-red-700" : "bg-[#DCFCE7] border-emerald-200 text-emerald-800"}`}>{habis ? "HABIS" : `SISA ${event.sisa} TIKET`}</span>
           </div>
+
           <h1 className="mt-5 text-3xl md:text-4xl font-black tracking-tight leading-tight text-zinc-900">{event.judul}</h1>
           <p className="mt-3 text-sm font-bold text-zinc-600">📅 {event.tanggal} • 📍 {event.lokasi}</p>
           <p className="mt-4 text-sm font-medium leading-relaxed text-zinc-600">{event.deskripsi}</p>
+
+          {namaAwal && (
+            <p className="mt-4 inline-flex items-center gap-1.5 rounded-full bg-[#FFFEF7] border border-orange-100 px-3 py-1.5 text-xs font-bold text-zinc-700">
+              👋 Halo lagi, <span className="font-black text-zinc-900">{namaAwal}</span> — nama lo udah keinget
+            </p>
+          )}
+
           <p className="mt-6 text-4xl font-black text-zinc-900">{rupiah(event.harga)}</p>
           <div className="mt-6">
             <div className="flex justify-between text- font-bold"><span className="text-zinc-600">Sisa {event.sisa} dari {event.kapasitas} tiket</span><span className="text-zinc-500">{terisi}% terisi</span></div>
@@ -34,8 +46,9 @@ export default async function DetailPage({ params }: { params: Promise<{ id: str
           <div className="mt-6"><TombolFavorit id={event.id} /></div>
         </div>
       </div>
+
       <div>
-        <FormPesan event={event} />
+        <FormPesan event={event} namaAwal={namaAwal} />
         <Link href="/pesanan" className="mt-4 block text-center rounded-full bg-[#FFFEF7] border border-orange-100 py-3 text-sm font-black text-zinc-900 hover:bg-[#FFFBEB] transition">Lihat Daftar Pesanan →</Link>
       </div>
     </div>

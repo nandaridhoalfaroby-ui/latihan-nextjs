@@ -5,12 +5,13 @@ import { pesanTiket } from "@/app/actions";
 import type { Event } from "@/data/events";
 import { rupiah } from "@/data/events";
 
-export default function FormPesan({ event }: { event: Event }) {
+export default function FormPesan({ event, namaAwal }: { event: Event; namaAwal: string }) {
   const router = useRouter();
   const [state, formAction, isPending] = useActionState(pesanTiket, {
     berhasil: false, pesan: "", galat: { nama: "", email: "", jumlah: "" },
   });
   const [jumlah, setJumlah] = useState(1);
+  const [nama, setNama] = useState(namaAwal);
 
   useEffect(() => {
     if (state.berhasil) router.refresh();
@@ -34,10 +35,17 @@ export default function FormPesan({ event }: { event: Event }) {
         <h2 className="text-lg font-black tracking-tight text-zinc-900">Pesan tiket</h2>
         <span className="rounded-full bg-[#DCFCE7] border border-emerald-200 px-3 py-1 text- font-black text-emerald-800">Sisa {event.sisa} tiket</span>
       </div>
+
+      {namaAwal && (
+        <p className="rounded-xl bg-[#FFFEF7] border border-orange-100 px-4 py-2.5 text-xs font-bold text-zinc-700">
+          👋 Halo <span className="font-black text-zinc-900">{namaAwal}</span>, selamat datang kembali!
+        </p>
+      )}
+
       <input type="hidden" name="eventId" value={event.id} />
       <div>
         <label className={labelCls}>NAMA PEMESAN</label>
-        <input name="nama" placeholder="Nama pemesan" className={inputCls} />
+        <input name="nama" value={nama} onChange={(e) => setNama(e.target.value)} placeholder="Nama pemesan" className={inputCls} />
         {state.galat.nama && <p className="mt-1.5 rounded-lg bg-[#FFE4E6] border border-red-200 px-3 py-2 text-xs font-bold text-red-700">{state.galat.nama}</p>}
       </div>
       <div>
