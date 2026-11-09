@@ -7,7 +7,6 @@ function jeda(ms: number) {
 
 export async function ambilEvents() {
   await jeda(1500);
-  throw new Error("Database sedang mati");
   return events;
 }
 
