@@ -1,8 +1,8 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #FFFBEB;
+  --foreground: #18181b;
 }
 
 @theme inline {
@@ -12,10 +12,11 @@
   --font-mono: var(--font-geist-mono);
 }
 
+/* Dark mode sengaja dimatiin biar tetep krem, gak jadi hitam */
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: #FFFBEB;
+    --foreground: #18181b;
   }
 }
 
@@ -23,4 +24,14 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+/* Biar scrollbar & selection juga nyatu sama tema */
+::selection {
+  background: #FFC837;
+  color: #18181b;
+}
+
+input[type="number"]::-webkit-inner-spin-button {
+  opacity: 1;
 }

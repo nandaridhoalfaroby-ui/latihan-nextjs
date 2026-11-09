@@ -13,8 +13,8 @@ export default function KatalogInteraktif({ events }: { events: Event[] }) {
   const [hargaMaks, setHargaMaks] = useState("");
 
   useEffect(() => {
-    const s = localStorage.getItem("urut") as any;
-    if (s) setUrut(s);
+    const s = localStorage.getItem("urut") as "tanggal" | "harga" | "nama" | null;
+    if (s === "tanggal" || s === "harga" || s === "nama") setUrut(s);
   }, []);
   useEffect(() => {
     localStorage.setItem("urut", urut);
@@ -51,14 +51,51 @@ export default function KatalogInteraktif({ events }: { events: Event[] }) {
         hanyaTersedia={hanyaTersedia} setHanyaTersedia={setHanyaTersedia}
         hargaMaks={hargaMaks} setHargaMaks={setHargaMaks}
       />
-      <p className="mb-1 text-sm text-slate-500">{terurut.length} event ditemu</p>
-      <p className="mb-3 text-sm font-medium">Rata-rata harga {rupiah(rataRata)} · Total sisa tiket {totalSisa}</p>
-      {ditampilkan.length === 0 ? <p>Tidak ada event yang cocok.</p> : <>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          {ditampilkan.map((e) => <KartuEvent key={e.id} event={e} />)}
+
+      {/* STATS BAR - TANPA TULISAN PUTIH */}
+      <div className="mb-5 flex flex-wrap items-center gap-3">
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-[#FFFEF7] border border-orange-100 px-3.5 py-1.5 text-xs font-black text-zinc-900 shadow-sm">
+          🎟️ <span>{terurut.length} event ditemu</span>
+        </span>
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-[#FFFBEB] border border-orange-100 px-3.5 py-1.5 text-xs font-bold text-zinc-700">
+          Rata-rata <span className="font-black text-zinc-900">{rupiah(rataRata)}</span>
+        </span>
+        <span className="inline-flex items-center gap-1.5 rounded-full bg-[#DCFCE7] border border-emerald-200 px-3.5 py-1.5 text-xs font-bold text-emerald-800">
+          Total sisa tiket <span className="font-black">{totalSisa}</span>
+        </span>
+      </div>
+
+      {ditampilkan.length === 0 ? (
+        <div className="rounded- bg-[#FFFBEB] border border-dashed border-orange-200 p-12 text-center">
+          <p className="text-5xl">🔍</p>
+          <h3 className="mt-4 text-lg font-black text-zinc-900">Tidak ada event yang cocok</h3>
+          <p className="mt-1 text-sm font-medium text-zinc-600">Coba ubah kata kunci atau filter harga / kategori</p>
+          <button 
+            onClick={() => { setCari(""); setKategori("Semua"); setHargaMaks(""); setHanyaTersedia(false); }}
+            className="mt-5 rounded-full bg-[#FFC837] border-2 border-amber-300 px-6 py-2.5 text-sm font-black text-zinc-900 hover:bg-[#FFD95E] transition"
+          >
+            Reset Filter
+          </button>
         </div>
-        {sisa > 0 && <div className="mt-6 text-center"><button onClick={() => setTampil(tampil + 4)} className="rounded bg-slate-800 px-4 py-2 text-white">Tampilkan lagi ({sisa} lagi)</button></div>}
-      </>}
+      ) : (
+        <>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {ditampilkan.map((e) => <KartuEvent key={e.id} event={e} />)}
+          </div>
+
+          {sisa > 0 && (
+            <div className="mt-8 text-center">
+              <button 
+                onClick={() => setTampil(tampil + 4)} 
+                className="rounded-full bg-[#FFC837] border-2 border-amber-300 px-7 py-3 text-sm font-black text-zinc-900 shadow-md hover:bg-[#FFD95E] hover:-translate-y-0.5 transition-all"
+              >
+                Tampilkan lagi ({sisa} lagi)
+              </button>
+              <p className="mt-2 text-xs font-medium text-zinc-500">Menampilkan {ditampilkan.length} dari {terurut.length} event</p>
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 }
