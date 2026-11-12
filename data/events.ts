@@ -38,15 +38,15 @@ export const events: Event[] = [
   },
   {
     id: 3,
-    judul: "Seminar AI",
-    kategori: "Seminar",
+    judul: "Lomba Cerdas Cermat",
+    kategori: "Lomba",
     tanggal: "2026-11-25",
     lokasi: "Aula",
     harga: 0,
     kapasitas: 100,
     sisa: 80,
-    gambar: "/img/event-3.png",
-    deskripsi: "Seminar AI untuk pemula, bahas ChatGPT, cara pakai AI buat belajar, dan demo langsung.",
+    gambar: "/img/event-6.png",
+    deskripsi: "Lomba cerdas cermat antar kelas, adu cepat tepat soal umum, sains, dan sejarah. Gratis, hadiah buat juara 1, 2, 3.",
   },
   {
     id: 4,
@@ -57,7 +57,7 @@ export const events: Event[] = [
     harga: 15000,
     kapasitas: 40,
     sisa: 35,
-    gambar: "/img/event-4.png",
+    gambar: "/img/event-5.png",
     deskripsi: "Lomba desain poster tema lingkungan. Karya terbaik dipajang di mading sekolah.",
   },
   {
@@ -69,7 +69,7 @@ export const events: Event[] = [
     harga: 10000,
     kapasitas: 50,
     sisa: 45,
-    gambar: "/img/event-5.png",
+    gambar: "/img/event-4.png",
     deskripsi: "Bazar buku bekas, komik, dan novel murah. Bawa uang pas ya.",
   },
   {
@@ -81,7 +81,7 @@ export const events: Event[] = [
     harga: 30000,
     kapasitas: 200,
     sisa: 150,
-    gambar: "/img/event-6.png",
+    gambar: "/img/event-3.png",
     deskripsi: "Konser musik dari band-band sekolah, ada guest star dari alumni juga.",
   },
 ];
