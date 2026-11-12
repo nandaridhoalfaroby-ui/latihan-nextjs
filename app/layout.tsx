@@ -1,18 +1,28 @@
-import type { Metadata } from "next";
+import { Poppins } from "next/font/google";
+import { Suspense } from "react";
 import "./globals.css";
 import Navbar from "@/components/Navbar";
 
-export const metadata: Metadata = {
+const poppins = Poppins({
+  subsets: ["latin"],
+  weight: ["400", "700"],
+  variable: "--font-poppins",
+  display: "swap",
+});
+
+export const metadata = {
   title: "EventKu",
-  description: "Katalog dan pemesanan tiket event sekolah",
+  description: "Katalog event sekolah",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="id" className="antialiased">
-      <body className="min-h-screen flex flex-col bg-[#FFFBEB] text-zinc-900">
-        <Navbar />
-        <main className="mx-auto w-full max-w-5xl flex-1 p-4 md:p-6">{children}</main>
+    <html lang="id" className={poppins.variable}>
+      <body className="min-h-screen flex flex-col bg-[#FFFBEB] font-[var(--font-poppins)] text-zinc-900 antialiased">
+        <Suspense>
+          <Navbar />
+        </Suspense>
+        <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6">{children}</main>
         <footer className="mt-8 border-t border-orange-100 bg-[#FFFEF7] p-5 text-center">
           <p className="text-sm font-black text-zinc-900">
             🎪 Event<span className="text-amber-600">Ku</span>

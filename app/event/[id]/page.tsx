@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { cookies } from "next/headers";
+import Image from "next/image";
 import { ambilEvent } from "@/data/ambil";
 import FormPesan from "@/components/FormPesan";
 import TombolFavorit from "@/components/TombolFavorit";
@@ -24,22 +25,28 @@ export default async function Detail({ params }: { params: Promise<{ id: string 
   return (
     <div className="mx-auto max-w-5xl grid md:grid-cols-[1.1fr_0.9fr] gap-6">
       {/* KIRI - INFO */}
-      <article className="relative overflow-hidden rounded- bg-[#FFFBEB] border border-orange-100 p-8 md:p-10 shadow-sm">
+      <article className="relative overflow-hidden rounded- bg-[#FFFBEB] border border-orange-100 p-6 md:p-8 shadow-sm">
         <div className="absolute -top-20 -right-20 h-64 w-64 rounded-full bg-[#FFC837]/30 blur-3xl" />
         <div className="absolute -bottom-20 -left-20 h-64 w-64 rounded-full bg-orange-200/40 blur-3xl" />
 
         <div className="relative">
-          <div className="flex flex-wrap gap-2">
-            <span className="inline-flex rounded-full bg-[#FFFEF7] border border-orange-100 px-3 py-1 text- font-black tracking-wide text-zinc-700 shadow-sm">
-              {event.kategori}
-            </span>
-            {laris && <span className="inline-flex rounded-full bg-[#FFC837] border border-amber-300 px-3 py-1 text- font-black text-zinc-900">🔥 Laris</span>}
-            <span className={`inline-flex rounded-full border px-3 py-1 text- font-black ${habis ? "bg-[#FFE4E6] border-red-200 text-red-700" : "bg-[#DCFCE7] border-emerald-200 text-emerald-800"}`}>
-              {habis ? "HABIS" : `SISA ${sisa} TIKET`}
-            </span>
+          <div className="relative mb-4 aspect-[40/21] w-full overflow-hidden rounded-2xl border border-orange-100">
+            <Image
+              src={event.gambar ?? "/img/default.png"}
+              alt={event.judul}
+              fill
+              sizes="(max-width: 1024px) 100vw, 960px"
+              priority
+              className="object-cover"
+            />
+            <div className="absolute left-3 top-3 flex gap-2">
+              <span className="rounded-full bg-[#FFFEF7] border border-orange-100 px-3 py-1 text- font-black text-zinc-700 shadow-sm">{event.kategori}</span>
+              {laris && <span className="rounded-full bg-[#FFC837] border border-amber-300 px-3 py-1 text- font-black text-zinc-900 shadow-sm">🔥 Laris</span>}
+              {habis && <span className="rounded-full bg-[#FFE4E6] border border-red-200 px-3 py-1 text- font-black text-red-700 shadow-sm">HABIS</span>}
+            </div>
           </div>
 
-          <h1 className="mt-5 text-3xl md:text-4xl font-black tracking-tight leading-tight text-zinc-900">{event.judul}</h1>
+          <h1 className="text-3xl md:text-4xl font-black tracking-tight leading-tight text-zinc-900">{event.judul}</h1>
           <p className="mt-3 text-sm font-bold text-zinc-600">📅 {event.tanggal} <span className="mx-1 text-zinc-300">•</span> 📍 {event.lokasi}</p>
           <p className="mt-4 text-sm font-medium leading-relaxed text-zinc-600">{event.deskripsi}</p>
 
