@@ -2,13 +2,21 @@ import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { cookies } from "next/headers";
 import Image from "next/image";
+import type { Metadata } from "next";
+import { events, rupiah } from "@/data/events";
 import { ambilEvent } from "@/data/ambil";
 import FormPesan from "@/components/FormPesan";
 import TombolFavorit from "@/components/TombolFavorit";
 import EventTerkait from "@/components/EventTerkait";
 
-function rupiah(n: number) {
-  return "Rp " + n.toLocaleString("id-ID");
+export async function generateMetadata({ params }: { params: Promise<{ id: string }> }): Promise<Metadata> {
+  const { id } = await params;
+  const event = events.find((e) => e.id === Number(id));
+  if (!event) return { title: "Event tidak ditemukan" };
+  return {
+    title: event.judul,
+    description: `Pesan tiket ${event.judul} di EventKu.`,
+  };
 }
 
 export default async function Detail({ params }: { params: Promise<{ id: string }> }) {
@@ -66,7 +74,6 @@ export default async function Detail({ params }: { params: Promise<{ id: string 
             <TombolFavorit id={event.id} />
           </div>
 
-          {/* EVENT TERKAIT */}
           <section className="mt-8 rounded-2xl bg-[#FFFEF7] border border-orange-100 p-5">
             <h2 className="text-sm font-black tracking-tight text-zinc-900">Event terkait</h2>
             <div className="mt-3">

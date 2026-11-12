@@ -11,7 +11,7 @@ const poppins = Poppins({
 });
 
 export const metadata = {
-  title: "EventKu",
+  title: { default: "EventKu", template: "%s - EventKu" },
   description: "Katalog event sekolah",
 };
 
