@@ -3,16 +3,24 @@
 :root {
   --background: #FFFBEB;
   --foreground: #18181b;
+  --kuning: #FFC837;
+  --kuning-muda: #FFD95E;
+  --oranye: #FF7A18;
+  --krem: #FFFEF7;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-kuning: var(--kuning);
+  --color-kuning-muda: var(--kuning-muda);
+  --color-oranye: var(--oranye);
+  --color-krem: var(--krem);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-/* Dark mode sengaja dimatiin biar tetep krem, gak jadi hitam */
+/* Dark mode sengaja dimatiin biar tetep krem, gak jadi hitam / putih */
 @media (prefers-color-scheme: dark) {
   :root {
     --background: #FFFBEB;
@@ -20,18 +28,84 @@
   }
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+  /* Pattern dot halus biar background gak polos */
+  background-image: radial-gradient(rgba(251, 146, 60, 0.10) 1.2px, transparent 1.2px);
+  background-size: 22px 22px;
+  -webkit-font-smoothing: antialiased;
 }
 
-/* Biar scrollbar & selection juga nyatu sama tema */
+/* Selection kuning */
 ::selection {
   background: #FFC837;
   color: #18181b;
 }
 
+/* Scrollbar modern - kuning oranye, bukan abu-abu */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #FFF7D6;
+}
+::-webkit-scrollbar-thumb {
+  background: linear-gradient(180deg, #FFC837, #FF7A18);
+  border-radius: 999px;
+  border: 2px solid #FFF7D6;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #FF7A18;
+}
+
+/* Hilangin scrollbar buat nav mobile */
+.no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Input / select / textarea - focus ring kuning modern */
+input, select, textarea {
+  outline: none;
+}
+input:focus, select:focus, textarea:focus {
+  border-color: #FFC837 !important;
+  box-shadow: 0 0 0 3px rgba(255, 200, 55, 0.35) !important;
+}
+
 input[type="number"]::-webkit-inner-spin-button {
   opacity: 1;
+}
+
+/* Animasi halus buat kartu & badge */
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+.animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+@keyframes pop {
+  0% { transform: scale(0.9); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+.animate-pop {
+  animation: pop 0.25s ease-out both;
+}
+
+/* Biar gambar gak bisa di-drag */
+img {
+  -webkit-user-drag: none;
+  user-select: none;
 }
