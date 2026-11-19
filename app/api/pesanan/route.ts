@@ -15,7 +15,7 @@ export async function GET() {
     const sb = supabaseAdmin();
 
     // COBA 1: Ambil semua, tanpa order (paling aman, gak maksa kolom apapun)
-    let { data, error } = await sb.from("pesanan").select("*");
+    const { data, error } = await sb.from("pesanan").select("*");
 
     // Kalau gagal, kasih tau error ASLI-nya dari Supabase, jangan ditutup-tutupin
     if (error) {

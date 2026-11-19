@@ -41,7 +41,7 @@ export async function cekKoneksiSupabase(): Promise<{ ok: boolean; kenapa: strin
   const { url } = ambilEnv();
   if (!url) return { ok: false, kenapa: "NEXT_PUBLIC_SUPABASE_URL kosong di .env.local" };
   try {
-    const res = await fetch(`${url}/rest/v1/`, { method: "GET", signal: AbortSignal.timeout(5000) });
+    await fetch(`${url}/rest/v1/`, { method: "GET", signal: AbortSignal.timeout(5000) });
     // Kalau dapet 401 / 404 / 200, berarti server-nya HIDUP, cuma butuh key. Itu OK.
     return { ok: true, kenapa: "" };
   } catch (e: any) {

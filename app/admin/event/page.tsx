@@ -1,236 +1,221 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import Link from "next/link";
-import { rupiah } from "@/data/events";
+import { useEffect, useMemo, useState } from "react";
+import { rupiah, type Event } from "@/data/events";
+import KartuEvent from "@/components/KartuEvent";
 
-// BACA JSON DENGAN AMAN - BIAR GAK MELEDAK KALAU API 404 / BALIKIN HTML
-async function bacaJsonAman(r: Response) {
+// BACA JSON AMAN - BIAR GAK MELEDAK KALAU API 404 / BALIKIN HTML
+async function bacaJsonAman(r: Response): Promise<unknown> {
   const teks = await r.text();
   const teksBersih = teks.trim();
-  if (!teksBersih) return { ok: false, error: "Respon kosong dari server" };
-  if (teksBersih.startsWith("<")) {
-    return {
-      ok: false,
-      error: `API ${r.url} balikin HTML (status ${r.status}), bukan JSON. File app/api/pesanan/route.ts belum ada / belum ke-restart.`,
-    };
-  }
+  if (!teksBersih) return [];
+  if (teksBersih.startsWith("<")) return [];
   try {
     return JSON.parse(teksBersih);
   } catch {
-    return { ok: false, error: "Respon server bukan JSON yang valid" };
+    return [];
   }
 }
 
-export default function AdminDashboard() {
-  const [events, setEvents] = useState<any[]>([]);
-  const [pesanan, setPesanan] = useState<any[]>([]);
+export default function Katalog() {
+  const [semua, setSemua] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
-  const [mounted, setMounted] = useState(false);
+  const [cari, setCari] = useState("");
+  const [kategori, setKategori] = useState("Semua");
+  const [pesanSeed, setPesanSeed] = useState("");
+  const [lagiSeed, setLagiSeed] = useState(false);
 
-  async function muat() {
+  async function load() {
     setLoading(true);
-    // EVENTS
     try {
-      const r = await fetch("/api/events", { cache: "no-store" });
-      const j = await bacaJsonAman(r);
-      if (Array.isArray(j)) setEvents(j);
-      else if (Array.isArray(j.events)) setEvents(j.events);
-      else if (Array.isArray(j.data)) setEvents(j.data);
-      else setEvents([]);
-    } catch (e) {
-      console.error("GET /api/events error:", e);
-      setEvents([]);
-    }
-
-    // PESANAN - INI YANG ERROR DI BARIS 51 TADI
-    // SEBELUM: const j = await r.json() -> meledak kalau 404 HTML
-    // SESUDAH: const j = await bacaJsonAman(r) -> aman, cuma console.error doang
-    let dariDB: any[] = [];
-    try {
-      const r = await fetch("/api/pesanan", { cache: "no-store" });
-      const j = await bacaJsonAman(r);
-      if (j.ok && Array.isArray(j.pesanan)) {
-        dariDB = j.pesanan;
-      } else if (!j.ok) {
-        console.error("GET /api/pesanan gagal:", j.error);
+      const res = await fetch("/api/events", { cache: "no-store" });
+      const j = await bacaJsonAman(res);
+      // API bisa balikin { ok, events: [...] } ATAU [...] langsung
+      if (Array.isArray(j)) setSemua(j as Event[]);
+      else if (j && typeof j === "object" && Array.isArray((j as { events?: unknown }).events)) {
+        setSemua((j as { events: Event[] }).events);
+      } else if (j && typeof j === "object" && Array.isArray((j as { data?: unknown }).data)) {
+        setSemua((j as { data: Event[] }).data);
+      } else {
+        setSemua([]);
       }
-    } catch (e) {
-      console.error("GET /api/pesanan error:", e);
-      dariDB = [];
+    } catch {
+      setSemua([]);
     }
-
-    // Gabung sama lokal biar Dashboard gak 0 padahal ada pesanan di perangkat ini
-    let dariLokal: any[] = [];
-    try {
-      dariLokal = JSON.parse(localStorage.getItem("pesanan-eventku") || "[]");
-      if (!Array.isArray(dariLokal)) dariLokal = [];
-    } catch { dariLokal = []; }
-
-    const kunci = (p: any) => [Number(p.event_id), p.nama, p.email, Number(p.jumlah), Number(p.total)].join("|");
-    const kunciDB = new Set(dariDB.map(kunci));
-    const lokalBaru = dariLokal.filter((p) => !kunciDB.has(kunci(p)));
-    setPesanan([...dariDB, ...lokalBaru]);
     setLoading(false);
   }
 
   useEffect(() => {
-    setMounted(true);
-    muat();
+    // FIX LINT: Jangan panggil setState langsung di effect, bungkus di async + cleanup
+    let batal = false;
+    (async () => {
+      if (batal) return;
+      await load();
+    })();
+    return () => {
+      batal = true;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const totalTiket = pesanan.reduce((s, p) => s + Number(p.jumlah || 0), 0);
-  const totalBayar = pesanan.reduce((s, p) => s + Number(p.total || 0), 0);
-  const totalGratis = pesanan.filter((p) => Number(p.total || 0) === 0).length;
+  async function isiDataContoh() {
+    setLagiSeed(true);
+    setPesanSeed("⏳ Lagi ngisi data ke Supabase...");
+    try {
+      const res = await fetch("/api/seed", { method: "POST" });
+      const d = (await bacaJsonAman(res)) as { error?: string; detail?: unknown; pesan?: string; ok?: boolean };
+      if (!res.ok) {
+        setPesanSeed(`❌ Gagal: ${d.error || "Gak tau"} - ${JSON.stringify(d.detail || "").slice(0, 300)}`);
+      } else {
+        setPesanSeed(`✅ ${d.pesan || "Berhasil isi data contoh!"}`);
+        await load();
+      }
+    } catch {
+      setPesanSeed("❌ Failed to fetch ke Supabase. Cek .env.local + internet lo.");
+    }
+    setLagiSeed(false);
+  }
+
+  const kategoriList = useMemo(() => ["Semua", ...Array.from(new Set(semua.map((e) => e.kategori)))], [semua]);
+  const tampil = useMemo(
+    () =>
+      semua.filter((e) => {
+        const cocokCari =
+          e.judul.toLowerCase().includes(cari.toLowerCase()) ||
+          e.lokasi.toLowerCase().includes(cari.toLowerCase());
+        const cocokKategori = kategori === "Semua" || e.kategori === kategori;
+        return cocokCari && cocokKategori;
+      }),
+    [semua, cari, kategori]
+  );
 
   return (
-    <div className="space-y-6">
-      {/* HEADER DASHBOARD - GELAP, BERWARNA, MEMUKAU, ANTI-WHITE */}
-      <div className="relative overflow-hidden rounded- border border-white/10 bg-[#1E103A]/90 p-6 shadow-[0_25px_50px_-12px_rgba(0,0,0,0.7)] backdrop-blur sm:p-7">
-        <div className="pointer-events-none absolute -right-10 -top-10 h-48 w-48 rounded-full bg-violet-500/25 blur-" />
-        <div className="pointer-events-none absolute -bottom-10 left-[40%] h-40 w-40 rounded-full bg-pink-500/20 blur-" />
-        <div className="pointer-events-none absolute right-[30%] top-0 h-24 w-24 rounded-full bg-amber-400/20 blur-" />
-        <div className="relative">
-          <span className="inline-flex items-center gap-2 rounded-full bg-black/40 px-3.5 py-1.5 text- font-black tracking-[0.16em] text-amber-300 ring-1 ring-white/15">
-            <span className="relative flex h-2 w-2">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-              <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" />
-            </span>
-            📊 DASHBOARD ADMIN • LIVE
-          </span>
-          <h1 className="mt-3 text- font-black leading-[1.05] tracking-tight sm:text-">
-            Halo Admin,{" "}
-            <span className="bg-linear-to-r from-amber-300 via-orange-400 to-pink-500 bg-clip-text text-transparent">
-              Semua Terkendali!
-            </span>
-          </h1>
-          <p className="mt-1.5 max-w-2xl text- leading-relaxed text-white/60">
-            Pantau event, pesanan, dan tiket dari sini. Semua data update otomatis dari Supabase + perangkat ini.
-          </p>
-
-          {/* STATS */}
-          <div className="mt-5 grid grid-cols-2 gap-3 md:grid-cols-4">
-            <div className="rounded- border border-white/10 bg-white/5 p-4 backdrop-blur transition hover:border-amber-400/30">
-              <p className="text- font-black tracking-widest text-white/50">TOTAL EVENT</p>
-              <p className="mt-1 text- font-black leading-none">{events.length}</p>
-              <div className="mt-2 h-1 w-full overflow-hidden rounded-full bg-white/10">
-                <div className="h-full w-[85%] rounded-full bg-linear-to-r from-amber-400 to-orange-500" />
-              </div>
+    <div className="w-full bg-[#120826] text-white" style={{ colorScheme: "dark" }}>
+      <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6">
+        <div className="relative overflow-hidden rounded- border border-white/10 bg-[#1E103A]/90 p-7 shadow-xl">
+          <div className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-violet-500/25 blur-" />
+          <div className="pointer-events-none absolute -bottom-10 -left-10 h-40 w-40 rounded-full bg-pink-500/25 blur-" />
+          <div className="relative">
+            <h1 className="text- font-black leading-tight md:text-">
+              Jelajahi Semua{" "}
+              <span className="bg-gradient-to-r from-amber-300 via-orange-400 to-pink-400 bg-clip-text text-transparent">
+                Event Seru.
+              </span>
+            </h1>
+            <p className="mt-2 text-sm text-white/60">Semua event dari Supabase, update real-time.</p>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <span className="rounded-full bg-white/10 px-4 py-1.5 text- font-black ring-1 ring-white/10">
+                ✅ {semua.length} Event Tersedia
+              </span>
+              <span className="rounded-full bg-white/10 px-4 py-1.5 text- font-black ring-1 ring-white/10">
+                ⚡ Update dari Supabase
+              </span>
             </div>
-            <div className="rounded- border border-white/10 bg-white/5 p-4 backdrop-blur transition hover:border-pink-400/30">
-              <p className="text- font-black tracking-widest text-white/50">TOTAL PESANAN</p>
-              <p className="mt-1 text- font-black leading-none text-pink-300">{pesanan.length}</p>
-              <div className="mt-2 h-1 w-full overflow-hidden rounded-full bg-white/10">
-                <div className="h-full w-[70%] rounded-full bg-linear-to-r from-pink-400 to-violet-400" />
-              </div>
+            <div className="mt-5 flex flex-col gap-2 sm:flex-row">
+              <input
+                value={cari}
+                onChange={(e) => setCari(e.target.value)}
+                placeholder="🔍 Cari event, lokasi..."
+                autoComplete="off"
+                className="flex-1 rounded-full border border-white/15 bg-[#2A1B52] px-5 py-3 text- font-semibold text-white shadow-[inset_0_0_0_1000px_#2A1B52] outline-none placeholder:text-white/30 focus:border-amber-400 focus:ring-2 focus:ring-amber-400/30 [-webkit-text-fill-color:white]"
+                style={{ colorScheme: "dark" }}
+              />
+              <select
+                value={kategori}
+                onChange={(e) => setKategori(e.target.value)}
+                className="rounded-full border border-white/15 bg-[#2A1B52] px-5 py-3 text- font-black text-white outline-none"
+                style={{ colorScheme: "dark" }}
+              >
+                {kategoriList.map((k) => (
+                  <option key={k} value={k} className="bg-[#2A1B52] text-white">
+                    {k}
+                  </option>
+                ))}
+              </select>
             </div>
-            <div className="rounded- border border-white/10 bg-white/5 p-4 backdrop-blur transition hover:border-emerald-400/30">
-              <p className="text- font-black tracking-widest text-white/50">TOTAL TIKET</p>
-              <p className="mt-1 text- font-black leading-none text-emerald-300">{totalTiket}</p>
-              <div className="mt-2 h-1 w-full overflow-hidden rounded-full bg-white/10">
-                <div className="h-full w-[60%] rounded-full bg-linear-to-r from-emerald-400 to-cyan-400" />
-              </div>
-            </div>
-            <div className="rounded- border border-white/10 bg-white/5 p-4 backdrop-blur transition hover:border-amber-400/30">
-              <p className="text- font-black tracking-widest text-white/50">TOTAL PEMASUKAN</p>
-              <p className="mt-1 text- font-black leading-none text-amber-300">{totalBayar === 0 ? "Gratis" : rupiah(totalBayar)}</p>
-              <p className="mt-2 text- font-bold text-white/50">{totalGratis} pesanan gratis • {pesanan.length - totalGratis} berbayar</p>
-            </div>
-          </div>
-
-          {/* TOMBOL CEPAT */}
-          <div className="mt-5 flex flex-wrap gap-2">
-            <Link href="/admin/event" className="rounded-full bg-linear-to-r from-amber-400 via-orange-500 to-pink-500 px-5 py-2.5 text- font-black text-white shadow-lg transition hover:scale-[1.03]">
-              ➕ Tambah Event
-            </Link>
-            <Link href="/admin/pesanan" className="rounded-full border border-white/20 bg-white/10 px-5 py-2.5 text- font-black text-white backdrop-blur transition hover:bg-white/15">
-              🧾 Kelola Pesanan →
-            </Link>
-            <Link href="/admin/event" className="rounded-full border border-white/20 bg-white/10 px-5 py-2.5 text- font-black text-white backdrop-blur transition hover:bg-white/15">
-              🎪 Kelola Event →
-            </Link>
-            <Link href="/" className="rounded-full border border-white/20 bg-white/10 px-5 py-2.5 text- font-black text-white backdrop-blur transition hover:bg-white/15">
-              👁 Lihat Web
-            </Link>
           </div>
         </div>
-      </div>
 
-      {/* PESANAN TERBARU */}
-      <div className="rounded- border border-white/10 bg-[#1E103A]/90 p-6 shadow-xl backdrop-blur">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <h2 className="text- font-black">Pesanan Terbaru</h2>
-            <p className="mt-0.5 text- text-white/50">5 pesanan paling baru, dari database + perangkat ini.</p>
-          </div>
-          <Link href="/admin/pesanan" className="shrink-0 rounded-full bg-white/10 px-4 py-2 text- font-black ring-1 ring-white/15 transition hover:bg-white/15">
-            Semua →
-          </Link>
+        <div className="mt-5 flex flex-wrap gap-2">
+          {["Semua", "Workshop", "Olahraga", "Musik", "Bazar", "Lomba"].map((k) => (
+            <button
+              key={k}
+              onClick={() => setKategori(k)}
+              className={`rounded-full px-4 py-2 text- font-black transition ${
+                kategori === k
+                  ? "bg-gradient-to-r from-amber-400 via-orange-500 to-pink-500 text-white shadow-lg"
+                  : "bg-white/10 text-white/70 ring-1 ring-white/10 hover:bg-white/20"
+              }`}
+            >
+              {k === "Semua"
+                ? "🏠 Semua"
+                : k === "Workshop"
+                  ? "💻 Workshop"
+                  : k === "Olahraga"
+                    ? "🏃 Olahraga"
+                    : k === "Musik"
+                      ? "🎵 Musik"
+                      : k === "Bazar"
+                        ? "🛍 Bazar"
+                        : "🏆 Lomba"}
+            </button>
+          ))}
         </div>
+
+        <p className="mt-5 text- font-bold text-white/40">
+          Menampilkan <b className="text-amber-300">{tampil.length}</b> event
+        </p>
 
         {loading ? (
-          <div className="mt-4 space-y-3">
+          <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {[1, 2, 3].map((i) => (
-              <div key={i} className="animate-pulse rounded- border border-white/10 bg-white/5 p-4">
-                <div className="h-4 w-1/3 rounded-full bg-white/10" />
-                <div className="mt-2 h-3 w-1/2 rounded-full bg-white/10" />
+              <div key={i} className="animate-pulse rounded- border border-white/10 bg-[#1E103A]/90 p-5">
+                <div className="h-36 rounded- bg-white/10" />
+                <div className="mt-4 h-4 w-3/4 rounded bg-white/10" />
               </div>
             ))}
           </div>
-        ) : pesanan.length === 0 ? (
-          <div className="mt-4 rounded- border border-dashed border-white/20 bg-white/5 p-8 text-center">
-            <p className="text-">🎪</p>
-            <p className="mt-2 text- font-black">Belum ada pesanan</p>
-            <p className="mt-1 text- text-white/50">Pesanan baru bakal muncul di sini otomatis.</p>
+        ) : tampil.length === 0 ? (
+          <div className="mt-4 rounded- border border-dashed border-white/20 bg-[#1E103A]/90 p-10 text-center shadow-xl">
+            <div className="mx-auto flex h-20 w-20 items-center justify-center rounded- bg-gradient-to-br from-violet-600 via-pink-500 to-orange-500 text- shadow-lg">
+              🔍
+            </div>
+            <p className="mt-4 text- font-black">Event tidak ditemukan</p>
+            <p className="mx-auto mt-1 max-w-md text-sm text-white/60">
+              Coba kata kunci atau kategori lain, atau isi data contoh dulu bro, 1 klik aja.
+            </p>
+            {/* INI TOMBOLNYA - KALAU GAK MUNCUL, BERARTI FILE BELUM KE-TIMPA */}
+            <button
+              onClick={isiDataContoh}
+              disabled={lagiSeed}
+              className="mt-5 rounded-full bg-gradient-to-r from-amber-400 via-orange-500 to-pink-500 px-7 py-3.5 text-sm font-black shadow-lg transition hover:scale-[1.03] disabled:opacity-50"
+            >
+              {lagiSeed ? "⏳ Lagi Ngisi..." : "✨ Isi 3 Event Contoh Sekarang"}
+            </button>
+            {pesanSeed && (
+              <p className="mx-auto mt-3 max-w-md rounded-2xl bg-black/30 p-3 text-left text- leading-relaxed text-white/70 ring-1 ring-white/10">
+                {pesanSeed}
+              </p>
+            )}
+            <button
+              onClick={() => {
+                setCari("");
+                setKategori("Semua");
+                load();
+              }}
+              className="mt-3 block mx-auto rounded-full border border-white/20 bg-white/10 px-6 py-2.5 text- font-black transition hover:bg-white hover:text-zinc-900"
+            >
+              Tampilkan Semua Event
+            </button>
           </div>
         ) : (
-          <div className="mt-4 space-y-3">
-            {pesanan.slice(0, 5).map((p: any) => (
-              <div key={`${p.nomor ?? p.id}-${p.event_id}-${p.nama}`} className="flex flex-wrap items-center justify-between gap-3 rounded- border border-white/10 bg-white/5 p-4 transition hover:border-amber-400/30">
-                <div className="min-w-0">
-                  <p className="truncate text- font-black">{p.judul || `Event ${p.event_id}`}</p>
-                  <p className="mt-0.5 truncate text- text-white/55">👤 {p.nama} • 📧 {p.email} • 🎟 {p.jumlah} tiket</p>
-                </div>
-                <div className="text-right">
-                  <p className="text- font-black text-amber-300">{rupiah(Number(p.total || 0))}</p>
-                  <p className="text- font-bold text-white/40">#{p.nomor ?? p.id}</p>
-                </div>
-              </div>
+          <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {tampil.map((e) => (
+              <KartuEvent key={e.id} event={e} />
             ))}
           </div>
         )}
       </div>
-
-      {/* EVENT TERBARU */}
-      <div className="rounded- border border-white/10 bg-[#1E103A]/90 p-6 shadow-xl backdrop-blur">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <h2 className="text- font-black">Event Terbaru</h2>
-            <p className="mt-0.5 text- text-white/50">Event yang paling baru ditambah.</p>
-          </div>
-          <Link href="/admin/event" className="shrink-0 rounded-full bg-white/10 px-4 py-2 text- font-black ring-1 ring-white/15 transition hover:bg-white/15">
-            Semua →
-          </Link>
-        </div>
-        {loading ? (
-          <p className="mt-4 text- font-bold text-white/50">⏳ Lagi muat...</p>
-        ) : events.length === 0 ? (
-          <p className="mt-4 text- text-white/50">Belum ada event. Tambah dulu dari tombol di atas bro.</p>
-        ) : (
-          <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            {events.slice(0, 4).map((e: any) => (
-              <Link key={e.id} href={`/event/${e.id}`} className="group rounded- border border-white/10 bg-white/5 p-4 transition hover:border-violet-400/40 hover:bg-white/10">
-                <p className="line-clamp-1 text- font-black group-hover:text-amber-300">{e.judul}</p>
-                <p className="mt-1 text- text-white/55">📅 {e.tanggal} • 📍 {e.lokasi}</p>
-                <p className="mt-1 text- font-black text-amber-300">{e.harga === 0 ? "🆓 GRATIS" : rupiah(Number(e.harga || 0))}</p>
-              </Link>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {mounted && <p className="hidden">mounted</p>}
     </div>
   );
 }

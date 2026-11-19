@@ -20,8 +20,6 @@ function supabaseAdmin() {
   return createClient(url, key, { auth: { persistSession: false } });
 }
 
-const GAGAL: HasilPesan = { berhasil: false, pesan: "", galat: {}, isian: { nama: "", email: "", jumlah: "1" } };
-
 // SEBELUM: pesanTiket(prev: any, ...) return { ok, error } -> gak nyambung sama useActionState(pesanTiket, AWAL) di /pesan
 // SESUDAH: pesanTiket(prev: HasilPesan, formData) return HasilPesan -> nyambung, error ts(2305) ilang
 export async function pesanTiket(prev: HasilPesan, formData: FormData): Promise<HasilPesan> {
