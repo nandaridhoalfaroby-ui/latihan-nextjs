@@ -1,31 +1,43 @@
 import Link from "next/link";
 import { alamatKatalog, type Saringan } from "@/data/saring";
 
-export default function Halaman({ s, hal, jumlah }: { s: Saringan; hal: number; jumlah: number }) {
+export default function Halaman({
+  s,
+  hal,
+  jumlah,
+}: {
+  s: Saringan;
+  hal: number;
+  jumlah: number;
+}) {
   if (jumlah <= 1) return null;
 
   return (
     <div className="mt-8 flex flex-col items-center gap-3">
-      {/* KAPSUL PAGINATION MELAYANG */}
-      <div className="inline-flex items-center gap-1.5 rounded-full bg-[#FFFEF7] border-2 border-orange-100 p-1.5 shadow-[0_8px_24px_rgba(251,146,60,0.15)]">
+      {/* KAPSUL PAGINATION MELAYANG - ANTI-WHITE, DARK + GLOW */}
+      <div className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-[#1E103A]/90 p-1.5 shadow-xl backdrop-blur">
         {/* Sebelumnya */}
         {hal > 1 ? (
           <Link
             href={alamatKatalog(s, hal - 1)}
-            className="flex items-center gap-1.5 rounded-full bg-[#FFF7D6] border border-orange-100 px-4 py-2.5 text-xs font-black text-zinc-800 hover:bg-[#FFFBEB] hover:-translate-y-0.5 transition-all"
+            className="flex items-center gap-1.5 rounded-full border border-white/15 bg-white/10 px-4 py-2.5 text-xs font-black text-white transition-all hover:-translate-y-0.5 hover:bg-white hover:text-zinc-900"
           >
-            <span className="grid h-5 w-5 place-items-center rounded-full bg-zinc-900 text- text-[#FFC837]">←</span>
+            <span className="grid h-5 w-5 place-items-center rounded-full bg-zinc-900 text- text-[#FFC837]">
+              ←
+            </span>
             Sebelumnya
           </Link>
         ) : (
-          <span className="flex items-center gap-1.5 rounded-full px-4 py-2.5 text-xs font-black text-zinc-300 cursor-not-allowed">
-            <span className="grid h-5 w-5 place-items-center rounded-full bg-zinc-100 text- text-zinc-400">←</span>
+          <span className="flex cursor-not-allowed items-center gap-1.5 rounded-full px-4 py-2.5 text-xs font-black text-white/30">
+            <span className="grid h-5 w-5 place-items-center rounded-full bg-white/10 text- text-white/40">
+              ←
+            </span>
             Sebelumnya
           </span>
         )}
 
         {/* Garis pemisah */}
-        <span className="hidden sm:block h-6 w-px bg-orange-100" />
+        <span className="hidden h-6 w-px bg-white/10 sm:block" />
 
         {/* Angka halaman */}
         <div className="flex items-center gap-1">
@@ -35,8 +47,9 @@ export default function Halaman({ s, hal, jumlah }: { s: Saringan; hal: number; 
               href={alamatKatalog(s, nomor)}
               className={
                 nomor === hal
-                  ? "grid h-10 w-10 place-items-center rounded-full bg-gradient-to-br from-[#FFC837] to-[#FFB020] border-2 border-amber-300 text-sm font-black text-zinc-900 shadow-[0_4px_14px_rgba(255,180,0,0.45)] scale-105"
-                  : "grid h-10 w-10 place-items-center rounded-full text-sm font-bold text-zinc-500 hover:bg-[#FFF7D6] hover:text-zinc-900 hover:scale-105 transition-all"
+                  // SEBELUM: bg-gradient-to-br -> SESUDAH: bg-linear-to-br, warning Ln 50 hilang
+                  ? "grid h-10 w-10 scale-105 place-items-center rounded-full border-2 border-amber-300 bg-linear-to-br from-[#FFC837] to-[#FFB020] text-sm font-black text-zinc-900 shadow-[0_4px_14px_rgba(255,180,0,0.45)]"
+                  : "grid h-10 w-10 place-items-center rounded-full text-sm font-bold text-white/60 transition-all hover:scale-105 hover:bg-white/10 hover:text-white"
               }
             >
               {nomor}
@@ -44,28 +57,33 @@ export default function Halaman({ s, hal, jumlah }: { s: Saringan; hal: number; 
           ))}
         </div>
 
-        <span className="hidden sm:block h-6 w-px bg-orange-100" />
+        <span className="hidden h-6 w-px bg-white/10 sm:block" />
 
         {/* Berikutnya */}
         {hal < jumlah ? (
           <Link
             href={alamatKatalog(s, hal + 1)}
-            className="flex items-center gap-1.5 rounded-full bg-zinc-900 px-4 py-2.5 text-xs font-black text-[#FFC837] shadow-md hover:bg-zinc-800 hover:-translate-y-0.5 transition-all"
+            className="flex items-center gap-1.5 rounded-full bg-white px-4 py-2.5 text-xs font-black text-zinc-900 shadow-md transition-all hover:-translate-y-0.5 hover:bg-amber-300"
           >
             Berikutnya
-            <span className="grid h-5 w-5 place-items-center rounded-full bg-[#FFC837] text- text-zinc-900">→</span>
+            <span className="grid h-5 w-5 place-items-center rounded-full bg-[#FFC837] text- text-zinc-900">
+              →
+            </span>
           </Link>
         ) : (
-          <span className="flex items-center gap-1.5 rounded-full px-4 py-2.5 text-xs font-black text-zinc-300 cursor-not-allowed">
+          <span className="flex cursor-not-allowed items-center gap-1.5 rounded-full px-4 py-2.5 text-xs font-black text-white/30">
             Berikutnya
-            <span className="grid h-5 w-5 place-items-center rounded-full bg-zinc-100 text- text-zinc-400">→</span>
+            <span className="grid h-5 w-5 place-items-center rounded-full bg-white/10 text- text-white/40">
+              →
+            </span>
           </span>
         )}
       </div>
 
-      {/* Label halaman */}
-      <p className="text- font-black tracking-wider text-zinc-400">
-        HALAMAN <span className="text-zinc-900">{hal}</span> DARI <span className="text-zinc-900">{jumlah}</span> • {jumlah} HALAMAN TOTAL
+      {/* Label halaman - ANTI-WHITE JUGA */}
+      <p className="text- font-black tracking-wider text-white/40">
+        HALAMAN <span className="text-amber-300">{hal}</span> DARI{" "}
+        <span className="text-amber-300">{jumlah}</span> • {jumlah} HALAMAN TOTAL
       </p>
     </div>
   );

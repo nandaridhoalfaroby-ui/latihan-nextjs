@@ -1,111 +1,68 @@
 @import "tailwindcss";
 
+/* Biar semua input tetep gelap, gak pernah putih */
 :root {
-  --background: #FFFBEB;
-  --foreground: #18181b;
-  --kuning: #FFC837;
-  --kuning-muda: #FFD95E;
-  --oranye: #FF7A18;
-  --krem: #FFFEF7;
+  color-scheme: dark;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-kuning: var(--kuning);
-  --color-kuning-muda: var(--kuning-muda);
-  --color-oranye: var(--oranye);
-  --color-krem: var(--krem);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-/* Dark mode sengaja dimatiin biar tetep krem, gak jadi hitam / putih */
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #FFFBEB;
-    --foreground: #18181b;
-  }
-}
-
-html {
-  scroll-behavior: smooth;
-}
-
+html,
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
-  /* Pattern dot halus biar background gak polos */
-  background-image: radial-gradient(rgba(251, 146, 60, 0.10) 1.2px, transparent 1.2px);
-  background-size: 22px 22px;
-  -webkit-font-smoothing: antialiased;
+  background: #120826;
+  color: white;
+  font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
 
-/* Selection kuning */
-::selection {
-  background: #FFC837;
-  color: #18181b;
+/* OBAT AUTOFILL CHROME - INI KUNCINYA */
+/* Chrome maksa background putih + teks hitam pas autofill. */
+/* Kita timpa pakai box-shadow inset 1000px warna gelap + teks putih. */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active,
+textarea:-webkit-autofill,
+select:-webkit-autofill {
+  -webkit-box-shadow: 0 0 0 1000px #2a1b52 inset !important;
+  box-shadow: 0 0 0 1000px #2a1b52 inset !important;
+  -webkit-text-fill-color: #fff !important;
+  color: #fff !important;
+  caret-color: #fff !important;
+  background-color: #2a1b52 !important;
+  transition: background-color 9999s ease-in-out 0s !important;
+  border-radius: 9999px !important;
 }
 
-/* Scrollbar modern - kuning oranye, bukan abu-abu */
+/* Biar angka di input number gak ada panah putih */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+/* Scrollbar gelap biar gak ada putih */
 ::-webkit-scrollbar {
   width: 10px;
-  height: 8px;
 }
 ::-webkit-scrollbar-track {
-  background: #FFF7D6;
+  background: #120826;
 }
 ::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, #FFC837, #FF7A18);
+  background: #3b2a6d;
   border-radius: 999px;
-  border: 2px solid #FFF7D6;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #FF7A18;
+  background: #5b3ea8;
 }
 
-/* Hilangin scrollbar buat nav mobile */
-.no-scrollbar {
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-}
-.no-scrollbar::-webkit-scrollbar {
-  display: none;
+::selection {
+  background: #f59e0b;
+  color: #120826;
 }
 
-/* Input / select / textarea - focus ring kuning modern */
-input, select, textarea {
-  outline: none;
-}
-input:focus, select:focus, textarea:focus {
-  border-color: #FFC837 !important;
-  box-shadow: 0 0 0 3px rgba(255, 200, 55, 0.35) !important;
-}
-
-input[type="number"]::-webkit-inner-spin-button {
-  opacity: 1;
-}
-
-/* Animasi halus buat kartu & badge */
-@keyframes float {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-6px); }
-}
-.animate-float {
-  animation: float 3s ease-in-out infinite;
-}
-
-@keyframes pop {
-  0% { transform: scale(0.9); opacity: 0; }
-  100% { transform: scale(1); opacity: 1; }
-}
-.animate-pop {
-  animation: pop 0.25s ease-out both;
-}
-
-/* Biar gambar gak bisa di-drag */
-img {
-  -webkit-user-drag: none;
-  user-select: none;
+/* Animasi halus buat semua */
+* {
+  -webkit-tap-highlight-color: transparent;
 }

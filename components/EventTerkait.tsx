@@ -1,76 +1,47 @@
 import Link from "next/link";
-import Image from "next/image";
-import { ambilTerkait } from "@/data/ambil";
+import { ambilEventTerkait } from "@/data/ambil";
 import type { Event } from "@/data/events";
 import { rupiah } from "@/data/events";
 
-function warnaKategori(kategori: string) {
-  const k = kategori.toLowerCase();
-  if (k.includes("musik") || k.includes("konser")) return "bg-pink-500 text-white";
-  if (k.includes("workshop") || k.includes("kelas") || k.includes("seminar")) return "bg-violet-500 text-white";
-  if (k.includes("olahraga") || k.includes("sport")) return "bg-emerald-500 text-white";
-  if (k.includes("seni") || k.includes("budaya")) return "bg-sky-500 text-white";
-  if (k.includes("teknologi") || k.includes("tech")) return "bg-indigo-500 text-white";
-  return "bg-amber-500 text-zinc-900";
-}
+export default async function EventTerkait({ id, kategori }: { id: number; kategori: string }) {
+  const terkait: Event[] = await ambilEventTerkait(id, kategori).catch(() => []);
 
-export default async function EventTerkait({ event }: { event: Event }) {
-  const terkait = await ambilTerkait(event);
-
-  if (terkait.length === 0) {
-    return (
-      <div className="rounded- bg-gradient-to-br from-[#FFF7D6] to-[#FFFBEB] border-2 border-dashed border-orange-200 p-6 text-center">
-        <div className="mx-auto grid h-12 w-12 place-items-center rounded-2xl bg-[#FFFEF7] border-2 border-amber-200 text-2xl shadow-sm -rotate-3">🔍</div>
-        <p className="mt-3 text-sm font-black text-zinc-900">Belum ada event terkait.</p>
-        <p className="text-xs font-medium text-zinc-500">Coba cek katalog lainnya</p>
-        <Link href="/event" className="mt-4 inline-flex rounded-full bg-zinc-900 px-5 py-2.5 text-xs font-black text-[#FFC837]">Jelajahi Katalog →</Link>
-      </div>
-    );
-  }
+  if (terkait.length === 0) return null;
 
   return (
-    <div className="space-y-3">
-      <div className="flex items-center justify-between">
-        <span className="inline-flex items-center gap-1.5 rounded-full bg-zinc-900 px-3 py-1.5 text- font-black tracking-wider text-[#FFC837]">✨ EVENT TERKAIT</span>
-        <span className="grid h-6 min-w-6 place-items-center rounded-full bg-[#FFC837] px-1.5 text- font-black text-zinc-900">{terkait.length}</span>
+    <div className="mt-8">
+      <div className="flex items-end justify-between gap-4">
+        <div>
+          <span className="inline-flex rounded-full bg-white px-4 py-1.5 text- font-black tracking-widest text-zinc-900">🎪 EVENT TERKAIT</span>
+          <h2 className="mt-3 text- font-black text-white">Mungkin Kamu Juga Suka</h2>
+        </div>
+        <Link href="/event" className="shrink-0 rounded-full border border-white/20 bg-white/10 px-4 py-2 text- font-black text-white transition hover:bg-white hover:text-zinc-900">Semua →</Link>
       </div>
 
-      <ul className="space-y-3">
-        {terkait.map((e) => (
-          <li key={e.id}>
-            <Link
-              href={`/event/${e.id}`}
-              className="group flex items-center gap-3 rounded- bg-[#FFFEF7] border-2 border-orange-100 p-3 shadow-sm hover:-translate-y-0.5 hover:shadow-md hover:border-amber-200 transition-all"
-            >
-              {/* Thumbnail */}
-              <span className="relative block h-14 w-14 shrink-0 overflow-hidden rounded-2xl">
-                <Image src={e.gambar ?? "/img/default.png"} alt={e.judul} fill className="object-cover group-hover:scale-110 transition-transform duration-500" />
-              </span>
-
-              <span className="flex-1 min-w-0">
-                <span className={`inline-flex rounded-full px-2.5 py-1 text- font-black tracking-wide ${warnaKategori(e.kategori)}`}>{e.kategori}</span>
-                <span className="mt-1 block truncate text-sm font-black text-zinc-900 group-hover:text-orange-600 transition">
-                  {e.judul}
-                </span>
-                <span className="mt-0.5 block truncate text- font-bold text-zinc-500">
-                  📅 {e.tanggal} • 📍 {e.lokasi}
-                </span>
-              </span>
-
-              <span className="shrink-0 text-right">
-                <span className="block rounded-full bg-gradient-to-r from-[#FFC837] to-[#FFB020] border border-amber-300 px-3 py-1.5 text-xs font-black text-zinc-900 shadow-sm">
-                  {rupiah(e.harga)}
-                </span>
-                <span className="mt-1.5 mx-auto grid h-6 w-6 place-items-center rounded-full bg-zinc-900 text- text-[#FFC837]">→</span>
-              </span>
+      <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {terkait.map((e: Event) => {
+          const terisi = Number(e.terisi ?? 0);
+          const sisa = Math.max(0, Number(e.kuota ?? 0) - terisi);
+          const habis = sisa <= 0;
+          return (
+            <Link key={e.id} href={`/event/${e.id}`} className="group overflow-hidden rounded- border border-white/10 bg-[#1E103A]/90 shadow-lg transition hover:-translate-y-1 hover:border-white/20">
+              {/* SEBELUM: bg-gradient-to-br -> SESUDAH: bg-linear-to-br, warning hilang */}
+              {/* SEBELUM: h- doang -> SESUDAH: h-36 */}
+              <div className="flex h-36 flex-col justify-end bg-linear-to-br from-violet-600 via-pink-500 to-orange-500 p-4">
+                <span className="w-fit rounded-full bg-black/40 px-3 py-1 text- font-black text-amber-300 ring-1 ring-white/20 backdrop-blur">{e.kategori}</span>
+                <p className="mt-2 text- font-black leading-tight text-white">{e.judul}</p>
+              </div>
+              <div className="p-4">
+                <p className="text- text-white/60">📍 {e.lokasi} • 📅 {String(e.tanggal).slice(0, 10)}</p>
+                <div className="mt-3 flex items-center justify-between">
+                  <p className="text- font-black text-amber-300">{rupiah(e.harga)}</p>
+                  <span className={`rounded-full px-3 py-1 text- font-black ${habis ? "bg-red-500 text-white" : "bg-emerald-500 text-white"}`}>{habis ? "HABIS" : `${sisa} SISA`}</span>
+                </div>
+              </div>
             </Link>
-          </li>
-        ))}
-      </ul>
-
-      <Link href="/event" className="block text-center rounded-full bg-[#FFF7D6] border-2 border-orange-100 py-2.5 text-xs font-black text-zinc-800 hover:bg-[#FFFBEB] transition">
-        Lihat Semua Event →
-      </Link>
+          );
+        })}
+      </div>
     </div>
   );
 }

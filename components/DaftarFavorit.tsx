@@ -1,119 +1,92 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import Image from "next/image";
+import { useEffect, useState } from "react";
 import type { Event } from "@/data/events";
 import { rupiah } from "@/data/events";
 
-function warnaKategori(kategori: string) {
-  const k = kategori.toLowerCase();
-  if (k.includes("musik") || k.includes("konser")) return "bg-pink-500 text-white";
-  if (k.includes("workshop") || k.includes("kelas") || k.includes("seminar")) return "bg-violet-500 text-white";
-  if (k.includes("olahraga") || k.includes("sport")) return "bg-emerald-500 text-white";
-  if (k.includes("seni") || k.includes("budaya")) return "bg-sky-500 text-white";
-  if (k.includes("teknologi") || k.includes("tech")) return "bg-indigo-500 text-white";
-  return "bg-amber-500 text-zinc-900";
-}
-
-export default function DaftarFavorit() {
-  const [favorit, setFavorit] = useState<Event[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  const bacaFavorit = useCallback(() => {
-    const ids: number[] = JSON.parse(localStorage.getItem("favorit") ?? "[]");
-    if (ids.length === 0) {
-      setFavorit([]);
-      setLoading(false);
-      return;
-    }
-    fetch("/api/events")
-      .then((r) => r.json())
-      .then((data: Event[]) => {
-        setFavorit(data.filter((e) => ids.includes(e.id)));
-        setLoading(false);
-      })
-      .catch(() => setLoading(false));
-  }, []);
+export default function DaftarFavorit({ semua }: { semua: Event[] }) {
+  const [favorit, setFavorit] = useState<number[]>([]);
+  const [siap, setSiap] = useState(false);
 
   useEffect(() => {
-    const t = setTimeout(bacaFavorit, 0);
-    window.addEventListener("favorit-berubah", bacaFavorit);
-    window.addEventListener("storage", bacaFavorit);
-    return () => {
-      clearTimeout(t);
-      window.removeEventListener("favorit-berubah", bacaFavorit);
-      window.removeEventListener("storage", bacaFavorit);
-    };
-  }, [bacaFavorit]);
+    try {
+      const raw = localStorage.getItem("eventku-favorit");
+      if (raw) setFavorit(JSON.parse(raw));
+    } catch {}
+    setSiap(true);
+  }, []);
 
-  const hapus = (id: number, ev: React.MouseEvent) => {
-    ev.preventDefault();
-    ev.stopPropagation();
-    const ids: number[] = JSON.parse(localStorage.getItem("favorit") ?? "[]");
-    localStorage.setItem("favorit", JSON.stringify(ids.filter((x) => x !== id)));
-    window.dispatchEvent(new Event("favorit-berubah"));
-    bacaFavorit();
+  const hapusFavorit = (id: number) => {
+    const baru = favorit.filter((x) => x !== id);
+    setFavorit(baru);
+    localStorage.setItem("eventku-favorit", JSON.stringify(baru));
   };
 
-  if (loading) return (
-    <div className="space-y-3">
-      {[1, 2, 3].map((i) => (
-        <div key={i} className="flex items-center gap-3 rounded- bg-[#FFFEF7] border-2 border-orange-100 p-3">
-          <div className="h-14 w-14 shrink-0 rounded-2xl bg-gradient-to-r from-[#FFF7D6] via-[#FFD95E] to-[#FFF7D6] bg-[length:200%_100%] animate-[shimmer_1.6s_linear_infinite]" />
-          <div className="flex-1 space-y-2">
-            <div className="h-4 w-3/4 rounded-full bg-[#FFF7D6]" />
-            <div className="h-3 w-1/2 rounded-full bg-[#FFF7D6]" />
-          </div>
-          <div className="h-8 w-16 rounded-full bg-[#FFF7D6]" />
-        </div>
-      ))}
-      <style>{`@keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }`}</style>
-    </div>
-  );
+  const kosongkan = () => {
+    setFavorit([]);
+    localStorage.removeItem("eventku-favorit");
+  };
 
-  if (favorit.length === 0) return (
-    <div className="rounded- bg-gradient-to-br from-[#FFF7D6] to-[#FFFBEB] border-2 border-orange-100 p-6 text-center">
-      <div className="mx-auto grid h-14 w-14 place-items-center rounded- bg-[#FFFEF7] border-2 border-amber-200 text-3xl shadow-md -rotate-3">💛</div>
-      <p className="mt-3 font-black text-zinc-900">Belum ada favorit.</p>
-      <p className="mt-1 text-xs font-medium text-zinc-500">Yuk simpan event yang kamu suka dulu.</p>
-      <Link href="/event" className="mt-4 inline-flex items-center gap-1.5 rounded-full bg-zinc-900 px-5 py-2.5 text-xs font-black text-[#FFC837]">Cari Event →</Link>
-    </div>
-  );
+  if (!siap) return null;
+  const daftar = semua.filter((e) => favorit.includes(e.id));
 
   return (
-    <div>
-      <div className="mb-3 flex items-center justify-between">
-        <span className="inline-flex items-center gap-1.5 rounded-full bg-zinc-900 px-3 py-1.5 text- font-black text-[#FFC837]">❤️ {favorit.length} FAVORIT KAMU</span>
-        <Link href="/favorit" className="text- font-black text-orange-600 hover:underline">Lihat Semua →</Link>
-      </div>
-
-      <div className="grid gap-3">
-        {favorit.map((e) => (
-          <div key={e.id} className="group relative flex items-center gap-3 rounded- bg-[#FFFEF7] border-2 border-orange-100 p-3 shadow-sm hover:-translate-y-0.5 hover:shadow-md hover:border-amber-200 transition-all">
-            {/* Thumbnail */}
-            <Link href={`/event/${e.id}`} className="relative h-16 w-16 shrink-0 overflow-hidden rounded-2xl">
-              <Image src={e.gambar ?? "/img/default.png"} alt={e.judul} fill className="object-cover group-hover:scale-110 transition-transform duration-500" />
-            </Link>
-
-            {/* Info */}
-            <Link href={`/event/${e.id}`} className="flex-1 min-w-0">
-              <span className={`inline-flex rounded-full px-2.5 py-1 text- font-black tracking-wide ${warnaKategori(e.kategori)}`}>{e.kategori}</span>
-              <p className="mt-1 truncate text-sm font-black text-zinc-900 group-hover:text-orange-600 transition">{e.judul}</p>
-              <p className="mt-0.5 truncate text- font-bold text-zinc-500">📅 {e.tanggal} • 📍 {e.lokasi}</p>
-            </Link>
-
-            {/* Harga + aksi */}
-            <div className="shrink-0 text-right">
-              <p className="text- font-black text-zinc-900">{rupiah(e.harga)}</p>
-              <div className="mt-1.5 flex items-center justify-end gap-1.5">
-                <Link href={`/event/${e.id}`} className="grid h-7 w-7 place-items-center rounded-full bg-[#FFC837] text- font-black text-zinc-900 shadow-sm">→</Link>
-                <button onClick={(ev) => hapus(e.id, ev)} title="Hapus dari favorit" className="grid h-7 w-7 place-items-center rounded-full bg-[#FDF2F8] border border-pink-100 text- hover:scale-110 active:scale-95 transition">❤️</button>
-              </div>
-            </div>
+    <div className="space-y-6">
+      {/* HEADER - SEBELUM: bg-gradient-to-r + bg-[length:200%_100%] -> SESUDAH: bg-linear-to-r + bg-size-[200%_100%] */}
+      <div className="relative overflow-hidden rounded- border border-white/10 bg-[#1E103A]/90 p-6 shadow-xl sm:p-7">
+        <div className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-violet-500/25 blur-" />
+        <div className="pointer-events-none absolute -bottom-10 -left-10 h-40 w-40 rounded-full bg-pink-500/25 blur-" />
+        <div className="relative flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <span className="inline-flex rounded-full bg-black/40 px-3.5 py-1 text- font-black tracking-widest text-amber-300 ring-1 ring-white/15">❤️ FAVORITKU</span>
+            <h1 className="mt-3 text- font-black leading-tight">Event yang <span className="bg-linear-to-r from-amber-300 via-orange-400 to-pink-400 bg-clip-text text-transparent bg-size-[200%_100%]">Lo Suka.</span></h1>
+            <p className="mt-1 text-sm text-white/60">{daftar.length} event tersimpan di favorit lo.</p>
           </div>
-        ))}
+          {daftar.length > 0 && (
+            <button onClick={kosongkan} className="rounded-full border border-white/20 bg-white/10 px-5 py-2.5 text- font-black transition hover:bg-white hover:text-zinc-900">🗑 Kosongkan Semua</button>
+          )}
+        </div>
       </div>
+
+      {daftar.length === 0 ? (
+        <div className="rounded- border border-dashed border-white/20 bg-[#1E103A]/90 p-10 text-center shadow-xl">
+          <div className="mx-auto flex h-20 w-20 items-center justify-center rounded- bg-linear-to-br from-violet-600 via-pink-500 to-orange-500 text- shadow-lg">💔</div>
+          <p className="mt-4 text- font-black">Belum ada favorit</p>
+          <p className="mt-1 text-sm text-white/60">Tap ❤️ di event mana aja, langsung kesimpen di sini.</p>
+          <Link href="/event" className="mt-5 inline-block rounded-full bg-linear-to-r from-amber-400 via-orange-500 to-pink-500 px-7 py-3 text-sm font-black shadow-lg transition hover:scale-[1.03]">🎪 Cari Event →</Link>
+        </div>
+      ) : (
+        <div className="grid gap-4 md:grid-cols-2">
+          {daftar.map((e) => {
+            const terisi = Number(e.terisi || 0);
+            const sisa = Math.max(0, Number(e.kuota || 0) - terisi);
+            return (
+              // SEBELUM: bg-white/[0.04] -> SESUDAH: bg-white/4
+              <div key={e.id} className="rounded- border border-white/10 bg-white/4 p-5 shadow-lg transition hover:-translate-y-0.5 hover:border-white/20">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <span className="rounded-full bg-black/40 px-3 py-1 text- font-black text-amber-300 ring-1 ring-white/15">{e.kategori}</span>
+                    <p className="mt-2 text- font-black leading-tight">{e.judul}</p>
+                    <p className="mt-1 text- text-white/50">📍 {e.lokasi} • 📅 {String(e.tanggal).slice(0, 10)}</p>
+                  </div>
+                  {/* SEBELUM: bg-white/[0.05] -> SESUDAH: bg-white/5 */}
+                  <button onClick={() => hapusFavorit(e.id)} className="shrink-0 rounded-full bg-white/5 px-3 py-1.5 text- transition hover:bg-red-500" title="Hapus dari favorit">❤️</button>
+                </div>
+                <div className="mt-4 flex items-center justify-between text- font-black">
+                  <span className="text-white/60">{sisa === 0 ? "HABIS" : `${sisa} kursi sisa`}</span>
+                  <span className="text-amber-300">{rupiah(e.harga)}</span>
+                </div>
+                <div className="mt-4 flex gap-2 border-t border-white/10 pt-3">
+                  <Link href={`/event/${e.id}`} className="rounded-full border border-white/20 bg-white/10 px-4 py-2 text- font-black transition hover:bg-white hover:text-zinc-900">👁 Lihat</Link>
+                  <Link href={`/pesan?event=${e.id}`} className="rounded-full bg-linear-to-r from-amber-400 via-orange-500 to-pink-500 px-4 py-2 text- font-black shadow transition hover:scale-[1.03]">🎟 Pesan</Link>
+                  <button onClick={() => hapusFavorit(e.id)} className="ml-auto rounded-full bg-red-500/15 px-4 py-2 text- font-black text-red-300 ring-1 ring-red-500/30 transition hover:bg-red-500 hover:text-white">🗑 Hapus</button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

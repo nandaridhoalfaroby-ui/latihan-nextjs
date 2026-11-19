@@ -40,14 +40,18 @@ export default function TombolFavorit({ id }: { id: number }) {
   return (
     <button
       onClick={toggle}
+      aria-pressed={aktif}
+      aria-label={aktif ? "Hapus dari favorit" : "Simpan ke favorit"}
       className={`inline-flex items-center gap-2 rounded-full border-2 px-4 py-2.5 text-xs font-black transition-all duration-200 hover:-translate-y-0.5 active:scale-95 ${
         aktif
-          ? "bg-gradient-to-r from-pink-500 to-rose-500 border-pink-400 text-white shadow-[0_6px_18px_rgba(236,72,153,0.4)]"
-          : "bg-[#FFFEF7] border-orange-100 text-zinc-700 hover:bg-[#FFF7D6] hover:border-amber-200 shadow-sm"
+          // SEBELUM: bg-gradient-to-r -> SESUDAH: bg-linear-to-r
+          ? "border-pink-400 bg-linear-to-r from-pink-500 to-rose-500 text-white shadow-[0_6px_18px_rgba(236,72,153,0.4)]"
+          // SEBELUM: bg-[#FFFEF7] + border-orange-100 + text-zinc-700 + hover:bg-[#FFF7D6] -> SESUDAH: dark glass anti-white
+          : "border-white/15 bg-[#2A1B52]/90 text-white/85 shadow-[0_6px_18px_rgba(0,0,0,0.35)] backdrop-blur hover:border-pink-400/50 hover:bg-pink-500/20 hover:text-white"
       } ${ngePop ? "scale-110" : ""}`}
     >
       <span className={`text- transition-transform duration-200 ${ngePop ? "scale-125" : ""}`}>
-        {aktif ? "❤️" : "🤍"}
+        {aktif ? "❤" : "🤍"}
       </span>
       {aktif ? "Disimpan!" : "Favorit"}
       {aktif && (

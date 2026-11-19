@@ -1,136 +1,362 @@
-import type { Metadata } from "next";
+"use client";
+
+import { useEffect, useState } from "react";
 import { ambilEvents } from "@/data/ambil";
-import { rupiah } from "@/data/events";
-import { bacaSaringan, saringEvents, PER_HALAMAN, alamatKatalog } from "@/data/saring";
+import type { Event } from "@/data/events";
 import KartuEvent from "@/components/KartuEvent";
 
-export const metadata: Metadata = { title: "Katalog Event" };
+const semuaKategori = [
+  "Semua",
+  "Workshop",
+  "Olahraga",
+  "Musik",
+  "Bazar",
+  "Lomba",
+];
 
-export default async function Katalog({ searchParams }: { searchParams: Promise<{ [kunci: string]: string | string[] | undefined }> }) {
-  const s = bacaSaringan(await searchParams);
-  const events = await ambilEvents();
-  const terurut = saringEvents(events, s);
+function warnaPill(kategori: string, aktif: boolean) {
+  if (aktif) {
+    // SEBELUM: bg-white + text-zinc-900 (putih) -> SESUDAH: gradient juara, dark
+    return "bg-linear-to-r from-amber-400 via-orange-500 to-pink-500 text-white shadow-xl shadow-orange-500/40 scale-[1.03] border-transparent";
+  }
 
-  const jumlahHal = Math.max(1, Math.ceil(terurut.length / PER_HALAMAN));
-  const hal = Math.min(s.hal, jumlahHal);
-  const ditampilkan = terurut.slice((hal - 1) * PER_HALAMAN, hal * PER_HALAMAN);
-  const daftarKategori = ["Semua", ...new Set(events.map((e) => e.kategori))];
-  const totalSisa = terurut.reduce((t, e) => t + e.sisa, 0);
-  const rataRata = terurut.length === 0 ? 0 : Math.round(terurut.reduce((t, e) => t + e.harga, 0) / terurut.length);
+  if (kategori === "Workshop")
+    return "border-orange-400/30 bg-orange-500/15 text-orange-300 hover:bg-orange-500/25";
 
-  return (
-    <div className="space-y-6">
-      {/* HEADER BANNER */}
-      <div className="relative overflow-hidden rounded- bg-gradient-to-br from-[#FFC837] via-[#FFB020] to-[#FF7A18] border-2 border-amber-300 p-6 md:p-8 shadow-[0_16px_40px_rgba(255,122,24,0.28)]">
-        <div className="absolute -right-10 -top-10 h-40 w-40 rounded-full bg-white/20" />
-        <div className="absolute -right-4 top-20 h-20 w-20 rounded-full bg-[#FFFEF7]/40" />
-        <div className="relative">
-          <span className="inline-flex rounded-full bg-zinc-900 px-3.5 py-1.5 text- font-black tracking-widest text-[#FFC837]">🎪 KATALOG EVENT</span>
-          <h1 className="mt-3 text-2xl md:text-3xl font-black tracking-tight text-zinc-900 leading-tight">Jelajahi Semua Event Sekolah 🎉</h1>
-          <p className="mt-1.5 max-w-xl text-sm font-bold leading-relaxed text-zinc-800/85">Semua event sekolah, pilih yang kamu suka, pesan tiketnya langsung dari sini.</p>
-        </div>
-      </div>
+  if (kategori === "Olahraga")
+    return "border-emerald-400/30 bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25";
 
-      {/* STATISTIK */}
-      <div className="grid grid-cols-3 gap-3 md:gap-4">
-        <div className="rounded- bg-[#FFFEF7] border-2 border-orange-100 p-4 md:p-5 text-center shadow-sm hover:-translate-y-1 transition">
-          <p className="text-xl md:text-2xl">🎪</p>
-          <p className="mt-1 text-xl md:text-2xl font-black text-zinc-900">{terurut.length}</p>
-          <p className="text- font-black text-zinc-500">EVENT DITEMUKAN</p>
-        </div>
-        <div className="rounded- bg-[#F5F3FF] border-2 border-violet-100 p-4 md:p-5 text-center shadow-sm hover:-translate-y-1 transition">
-          <p className="text-xl md:text-2xl">💰</p>
-          <p className="mt-1 text- md:text-2xl font-black text-violet-700 leading-tight">{rupiah(rataRata)}</p>
-          <p className="text- font-black text-zinc-500">RATA-RATA HARGA</p>
-        </div>
-        <div className="rounded- bg-[#F0FDF4] border-2 border-emerald-100 p-4 md:p-5 text-center shadow-sm hover:-translate-y-1 transition">
-          <p className="text-xl md:text-2xl">🎟️</p>
-          <p className="mt-1 text-xl md:text-2xl font-black text-emerald-700">{totalSisa}</p>
-          <p className="text- font-black text-zinc-500">SISA TIKET</p>
-        </div>
-      </div>
+  if (kategori === "Musik")
+    return "border-pink-400/30 bg-pink-500/15 text-pink-300 hover:bg-pink-500/25";
 
-      {/* FILTER */}
-      <div className="rounded- bg-[#FFFEF7] border-2 border-orange-100 p-5 md:p-6 shadow-sm">
-        <div className="flex items-center gap-2">
-          <span className="grid h-8 w-8 place-items-center rounded-full bg-[#FFC837] text-">🔍</span>
-          <h2 className="font-black text-zinc-900">Cari & Filter Event</h2>
-        </div>
-        {/* key: bila URL berubah, formulir dibuat ulang agar isiannya ikut URL */}
-        <div className="mt-4">
-          <KontrolKatalog key={JSON.stringify(s)} s={s} daftarKategori={daftarKategori} />
-        </div>
-      </div>
+  if (kategori === "Bazar")
+    return "border-amber-400/30 bg-amber-500/15 text-amber-300 hover:bg-amber-500/25";
 
-      {terurut.length === 0 ? (
-        <div className="overflow-hidden rounded- bg-[#FFFBEB] border-2 border-orange-100 shadow-sm text-center">
-          <div className="bg-gradient-to-r from-[#FFC837] to-[#FF7A18] py-6">
-            <div className="mx-auto grid h-16 w-16 place-items-center rounded- bg-[#FFFEF7] border-2 border-amber-200 text-3xl shadow-lg rotate-3">🔍</div>
-          </div>
-          <div className="p-8">
-            <h2 className="text-lg font-black text-zinc-900">Tidak ada event yang cocok.</h2>
-            <p className="mt-1 text-sm font-medium text-zinc-600">Coba ubah kata kunci atau reset filter di atas.</p>
-            <a href="/event" className="mt-4 inline-flex rounded-full bg-zinc-900 px-5 py-2.5 text-sm font-black text-[#FFC837]">Reset Filter ↺</a>
-          </div>
-        </div>
-      ) : (
-        <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          {ditampilkan.map((e) => <KartuEvent key={e.id} event={e} />)}
-        </div>
-      )}
+  if (kategori === "Lomba")
+    return "border-yellow-400/30 bg-yellow-500/15 text-yellow-300 hover:bg-yellow-500/25";
 
-      {/* Pagination - saringan dibawa terus */}
-      <div className="flex flex-wrap items-center justify-center gap-2">
-        {hal > 1 && (
-          <a href={alamatKatalog(s, hal - 1)} className="rounded-full bg-[#FFFEF7] border-2 border-orange-100 px-5 py-2.5 text-sm font-black text-zinc-900 hover:bg-[#FFF7D6] hover:-translate-y-0.5 transition">
-            ← Sebelumnya
-          </a>
-        )}
-        <span className="rounded-full bg-zinc-900 px-5 py-2.5 text-sm font-black text-[#FFC837] shadow-md">Halaman {hal} dari {jumlahHal}</span>
-        {hal < jumlahHal && (
-          <a href={alamatKatalog(s, hal + 1)} className="rounded-full bg-gradient-to-r from-[#FFC837] to-[#FFB020] border-2 border-amber-300 px-5 py-2.5 text-sm font-black text-zinc-900 shadow-md hover:-translate-y-0.5 transition">
-            Berikutnya →
-          </a>
-        )}
-      </div>
-    </div>
-  );
+  // SEBELUM: bg-white/[0.07] + hover:bg-white/[0.12] -> SESUDAH: bg-white/7 + hover:bg-white/12
+  return "border-white/15 bg-white/7 text-white/80 hover:bg-white/12";
 }
 
-function KontrolKatalog({
-  s,
-  daftarKategori,
-}: {
-  s: ReturnType<typeof bacaSaringan>;
-  daftarKategori: string[];
-}) {
+export default function Katalog() {
+  const [events, setEvents] = useState<Event[]>([]);
+  const [cari, setCari] = useState("");
+  const [kategori, setKategori] = useState("Semua");
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    ambilEvents()
+      .then((data) => {
+        setEvents(data);
+      })
+      .catch((error) => {
+        console.error("Gagal mengambil event:", error);
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+  }, []);
+
+  const hasil = events.filter((e) => {
+    // ERROR SEBELUM: e.nama possibly undefined -> SESUDAH: (e.judul ?? "") + (e.lokasi ?? "")
+    const cocokCari =
+      (e.judul ?? "").toLowerCase().includes(cari.toLowerCase()) ||
+      (e.lokasi ?? "").toLowerCase().includes(cari.toLowerCase());
+
+    const cocokKategori =
+      kategori === "Semua" || e.kategori === kategori;
+
+    return cocokCari && cocokKategori;
+  });
+
+  function resetFilter() {
+    setCari("");
+    setKategori("Semua");
+  }
+
   return (
-    <form action="/event" method="get" className="flex flex-wrap items-end gap-3">
-      {Object.entries(s)
-        .filter(([nama]) => nama !== "hal")
-        .map(([nama, nilai]) => (
-          <label key={nama} className="grid flex-1 min-w- gap-1.5 text- font-black tracking-wider text-zinc-500 uppercase">
-            {nama === "q" ? "🔍 Cari" : nama === "kategori" ? "🎪 Kategori" : nama}
-            {nama.toLowerCase().includes("kategori") ? (
-              <select name={nama} defaultValue={String(nilai)} className="rounded-xl border-2 border-orange-100 bg-[#FFFBEB] px-3.5 py-2.5 text-sm font-bold text-zinc-900 normal-case tracking-normal focus:border-[#FFC837] focus:ring-2 focus:ring-amber-200">
-                {daftarKategori.map((kategori) => (
-                  <option key={kategori} value={kategori === "Semua" ? "" : kategori}>{kategori}</option>
-                ))}
-              </select>
-            ) : (
+    <main className="mx-auto max-w-6xl px-4 pb-16 pt-6">
+
+      {/* HERO - DARK + GLOW */}
+      <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-[#1E103A]/90 p-7 shadow-[0_25px_60px_-20px_rgba(0,0,0,0.6)] backdrop-blur md:p-10">
+
+        {/* BACKGROUND GLOW */}
+        <div className="pointer-events-none absolute -right-10 -top-10 h-48 w-48 rounded-full bg-orange-500/30 blur-3xl" />
+
+        <div className="pointer-events-none absolute -bottom-10 -left-10 h-48 w-48 rounded-full bg-pink-500/30 blur-3xl" />
+
+        <div className="pointer-events-none absolute left-1/2 top-0 h-24 w-72 rounded-full bg-violet-500/20 blur-3xl" />
+
+        {/* LIVE BADGE - SEBELUM: bg-white + text-zinc-900 (putih) -> SESUDAH: dark glass */}
+        <div className="pointer-events-none absolute right-8 top-6 hidden rotate-12 rounded-full bg-white/10 px-3 py-1.5 text-xs font-black tracking-widest text-white ring-1 ring-white/20 shadow-lg backdrop-blur md:block">
+          🎪 LIVE!
+        </div>
+
+        <div className="relative">
+
+          {/* LABEL */}
+          <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-2 text-xs font-black tracking-[0.16em] text-white backdrop-blur">
+            <span className="relative flex h-2 w-2">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+              <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" />
+            </span>
+
+            🎪 KATALOG EVENT • {events.length} EVENT
+          </span>
+
+          {/* TITLE */}
+          <h1 className="mt-4 text-4xl font-black leading-[0.95] tracking-tight text-white md:text-6xl">
+            Cari Event Seru,
+            <br />
+
+            {/* SEBELUM: bg-gradient-to-r -> SESUDAH: bg-linear-to-r */}
+            <span className="bg-linear-to-r from-amber-300 via-orange-400 to-pink-400 bg-clip-text text-transparent">
+              Pesan
+            </span>{" "}
+            & Hadir!
+          </h1>
+
+          {/* DESCRIPTION */}
+          <p className="mt-4 max-w-2xl text-sm font-medium leading-relaxed text-white/65 md:text-base">
+            Semua event sekolah dalam satu tempat — dari Supabase,
+            update real-time. Tinggal cari, klik, pesan!
+          </p>
+
+          {/* SEARCH + FILTER - DARK GLASSMORPHISM */}
+          <div className="mt-7 flex flex-col gap-3 sm:flex-row">
+
+            {/* SEARCH INPUT */}
+            <div className="relative flex-1">
+
+              <span className="absolute left-5 top-1/2 -translate-y-1/2 text-white/50">
+                🔍
+              </span>
+
               <input
-                name={nama}
-                defaultValue={String(nilai)}
-                placeholder={nama === "q" ? "Cari judul / lokasi..." : ""}
-                className="rounded-xl border-2 border-orange-100 bg-[#FFFBEB] px-3.5 py-2.5 text-sm font-bold text-zinc-900 placeholder:text-zinc-400 normal-case tracking-normal focus:border-[#FFC837] focus:ring-2 focus:ring-amber-200"
+                type="text"
+                value={cari}
+                onChange={(e) => setCari(e.target.value)}
+                placeholder="Cari event, misal: Futsal, Musik, Workshop..."
+                autoComplete="off"
+                style={{
+                  backgroundColor: "#160D2B",
+                  color: "#FFFFFF",
+                  colorScheme: "dark",
+                  borderColor: "rgba(255,255,255,0.15)",
+                }}
+                // SEBELUM: !box-border !w-full !rounded-full ... !outline-none placeholder:!font-medium ... -> SESUDAH: semua ! pindah ke belakang
+                className="box-border! w-full! rounded-full! border! border-white/15! bg-[#160D2B]! py-3.5! pl-12! pr-5! text-sm! font-bold! text-white! shadow-inner shadow-black/20 outline-none! backdrop-blur-xl transition-all duration-300 placeholder:font-medium! placeholder:text-white/40! hover:border-orange-400/50! focus:border-orange-400! focus:bg-[#21133D]! focus:ring-2! focus:ring-orange-400/25!"
               />
-            )}
-          </label>
+
+            </div>
+
+            {/* CATEGORY SELECT */}
+            <select
+              value={kategori}
+              onChange={(e) => setKategori(e.target.value)}
+              style={{
+                backgroundColor: "#160D2B",
+                color: "#FFFFFF",
+                colorScheme: "dark",
+                borderColor: "rgba(255,255,255,0.15)",
+              }}
+              // SEBELUM: !box-border !cursor-pointer ... -> SESUDAH: semua ! pindah ke belakang
+              className="box-border! cursor-pointer! rounded-full! border! border-white/15! bg-[#160D2B]! px-6! py-3.5! text-sm! font-bold! text-white! shadow-lg outline-none! transition-all hover:border-orange-400/50! focus:border-orange-400! focus:ring-2! focus:ring-orange-400/25! [&>option]:bg-[#1E103A]! [&>option]:text-white!"
+            >
+              {semuaKategori.map((k) => (
+                <option key={k} value={k}>
+                  {k === "Semua" ? "🎪 Semua Kategori" : k}
+                </option>
+              ))}
+            </select>
+
+          </div>
+
+          {/* MINI STATS */}
+          <div className="mt-6 flex flex-wrap gap-2">
+
+            {/* SEBELUM: bg-white/[0.08] -> SESUDAH: bg-white/8 */}
+            <span className="rounded-full border border-white/15 bg-white/8 px-4 py-2 text-xs font-black text-white backdrop-blur">
+              🎟 {events.length} Event Tersedia
+            </span>
+
+            <span className="rounded-full border border-emerald-400/30 bg-emerald-500/15 px-4 py-2 text-xs font-black text-emerald-300 backdrop-blur">
+              🆓 {events.filter((e) => e.harga === 0).length} Gratis
+            </span>
+
+            <span className="rounded-full border border-white/15 bg-white/8 px-4 py-2 text-xs font-black text-white backdrop-blur">
+              ⚡ Update dari Supabase
+            </span>
+
+          </div>
+
+        </div>
+      </div>
+
+      {/* CATEGORY PILLS */}
+      <div className="mt-8 flex flex-wrap gap-2">
+
+        {semuaKategori.map((k) => (
+          <button
+            key={k}
+            onClick={() => setKategori(k)}
+            className={`rounded-full border px-5 py-2.5 text-sm font-black backdrop-blur transition hover:-translate-y-0.5 ${warnaPill(
+              k,
+              kategori === k
+            )}`}
+          >
+            {k === "Semua"
+              ? "🎪 Semua"
+              : k === "Workshop"
+              ? "💻 Workshop"
+              : k === "Olahraga"
+              ? "⚽ Olahraga"
+              : k === "Musik"
+              ? "🎵 Musik"
+              : k === "Bazar"
+              ? "🛍 Bazar"
+              : "🏆 Lomba"}
+          </button>
         ))}
-      <button type="submit" className="rounded-full bg-zinc-900 px-6 py-3 text-sm font-black text-[#FFC837] shadow-md hover:bg-zinc-800 hover:-translate-y-0.5 transition-all">
-        Terapkan ✓
-      </button>
-      <a href="/event" className="rounded-full bg-[#FFF7D6] border-2 border-orange-100 px-5 py-3 text-sm font-black text-zinc-700 hover:bg-[#FFFBEB] transition">Reset ↺</a>
-    </form>
+
+      </div>
+
+      {/* RESULT INFORMATION */}
+      <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
+
+        <p className="text-sm font-bold text-white/60">
+          Menampilkan{" "}
+          <span className="font-black text-amber-300">
+            {hasil.length}
+          </span>{" "}
+          event
+
+          {kategori !== "Semua" && (
+            <>
+              {" "}• Kategori{" "}
+              <span className="font-black text-white">
+                {kategori}
+              </span>
+            </>
+          )}
+
+          {cari && (
+            <>
+              {" "}• Cari “
+              <span className="font-black text-white">
+                {cari}
+              </span>
+              ”
+            </>
+          )}
+        </p>
+
+        {(cari || kategori !== "Semua") && (
+          <button
+            onClick={resetFilter}
+            className="rounded-full bg-red-500/15 px-4 py-1.5 text-xs font-black text-red-300 ring-1 ring-red-500/30 transition hover:bg-red-500 hover:text-white"
+          >
+            ✕ Reset Filter
+          </button>
+        )}
+
+      </div>
+
+      {/* LOADING STATE */}
+      {loading ? (
+
+        <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+
+          {[1, 2, 3, 4, 5, 6].map((i) => (
+            <div
+              key={i}
+              // SEBELUM: bg-white/[0.05] -> SESUDAH: bg-white/5
+              className="animate-pulse rounded-3xl border border-white/10 bg-white/5 p-5 backdrop-blur"
+            >
+              <div className="h-48 rounded-2xl bg-white/10" />
+
+              <div className="mt-4 h-5 w-3/4 rounded-full bg-white/10" />
+
+              <div className="mt-2 h-4 w-1/2 rounded-full bg-white/10" />
+            </div>
+          ))}
+
+        </div>
+
+      ) : hasil.length === 0 ? (
+
+        /* EMPTY STATE */
+        <div className="mt-10 rounded-3xl border border-dashed border-white/20 bg-white/4 p-10 text-center backdrop-blur">
+
+          {/* SEBELUM: bg-gradient-to-br -> SESUDAH: bg-linear-to-br */}
+          <div className="mx-auto grid h-16 w-16 place-items-center rounded-2xl bg-linear-to-br from-violet-500 to-pink-500 text-2xl shadow-lg shadow-pink-500/30">
+            🔍
+          </div>
+
+          <p className="mt-3 text-lg font-black text-white">
+            Event tidak ditemukan
+          </p>
+
+          <p className="text-sm text-white/60">
+            Coba kata kunci atau kategori lain.
+          </p>
+
+          <button
+            onClick={resetFilter}
+            // SEBELUM: bg-gradient-to-r -> SESUDAH: bg-linear-to-r
+            className="mt-5 rounded-full bg-linear-to-r from-amber-400 via-orange-500 to-pink-500 px-6 py-3 text-sm font-black text-white shadow-[0_15px_30px_-10px_rgba(249,115,22,0.6)] transition hover:scale-[1.03]"
+          >
+            Tampilkan Semua Event
+          </button>
+
+        </div>
+
+      ) : (
+
+        /* EVENT GRID */
+        <div className="mt-6 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+
+          {hasil.map((event) => (
+            <KartuEvent key={event.id} event={event} />
+          ))}
+
+        </div>
+
+      )}
+
+      {/* BOTTOM BANNER */}
+      {/* SEBELUM: bg-gradient-to-r -> SESUDAH: bg-linear-to-r */}
+      <div className="relative mt-12 flex flex-col items-start justify-between gap-5 overflow-hidden rounded-3xl bg-linear-to-r from-violet-600 via-pink-500 to-orange-500 p-7 shadow-[0_30px_60px_-20px_rgba(236,72,153,0.6)] md:flex-row md:items-center md:p-9">
+
+        <div className="pointer-events-none absolute -right-10 -top-10 h-44 w-44 rounded-full bg-white/20 blur-3xl" />
+
+        <div className="relative">
+
+          <span className="rounded-full bg-black/25 px-3 py-1 text-xs font-black tracking-widest text-white backdrop-blur">
+            ⏰ JANGAN DITUNDA
+          </span>
+
+          <p className="mt-3 text-xl font-black leading-tight text-white md:text-2xl">
+            Jangan Sampai Kehabisan Tiket! 🎟
+          </p>
+
+          <p className="mt-1 text-sm text-white/85">
+            Event favorit kamu bisa habis kapan aja. Cek sekarang, pesan sekarang.
+          </p>
+
+        </div>
+
+        <a
+          href="#top"
+          // SEBELUM: bg-white + text-zinc-900 (putih) -> SESUDAH: dark glass
+          className="relative shrink-0 rounded-full bg-[#120826]/85 px-7 py-3.5 text-sm font-black text-white ring-1 ring-white/25 shadow-xl backdrop-blur transition hover:scale-105"
+        >
+          Lihat Event →
+        </a>
+
+      </div>
+
+    </main>
   );
 }

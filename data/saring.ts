@@ -13,6 +13,12 @@ export type Saringan = {
 
 type IsiURL = { [kunci: string]: string | string[] | undefined };
 
+// BARU: helper sisa, karena di type Event gak ada field 'sisa'
+// sisa = kuota - terisi (dari Supabase), biar konsisten sama Katalog + Detail + Pesan + Favorit
+function sisaTiket(e: Event) {
+  return Math.max(0, (e.kuota ?? 0) - (e.terisi ?? 0));
+}
+
 // Ubah isi URL (atau tidak ada) jadi saringan yang aman dipakai
 export function bacaSaringan(isi: IsiURL): Saringan {
   const teks = (kunci: string) => {
@@ -34,15 +40,20 @@ export function bacaSaringan(isi: IsiURL): Saringan {
 export function saringEvents(events: Event[], s: Saringan) {
   const hasil = events.filter(
     (e) =>
-      e.judul.toLowerCase().includes(s.cari.toLowerCase()) &&
+      // SEBELUM: e.judul.toLowerCase() -> bisa crash kalau judul undefined. SESUDAH: (e.judul ?? "")
+      (e.judul ?? "").toLowerCase().includes(s.cari.toLowerCase()) &&
       (s.kategori === "Semua" || e.kategori === s.kategori) &&
-      (!s.sisa || e.sisa > 0) &&
-      (s.max === null || e.harga <= s.max)
+      // ERROR SEBELUM: e.sisa gak ada di type Event -> SESUDAH: sisaTiket(e) = kuota - terisi
+      (!s.sisa || sisaTiket(e) > 0) &&
+      // SEBELUM: e.harga bisa undefined -> SESUDAH: (e.harga ?? 0)
+      (s.max === null || (e.harga ?? 0) <= s.max),
   );
   return [...hasil].sort((a, b) => {
-    if (s.urut === "harga") return a.harga - b.harga;
-    if (s.urut === "nama") return a.judul.localeCompare(b.judul);
-    return a.tanggal.localeCompare(b.tanggal);
+    if (s.urut === "harga") return (a.harga ?? 0) - (b.harga ?? 0);
+    // SEBELUM: a.judul.localeCompare -> bisa crash kalau judul undefined. SESUDAH: (a.judul ?? "")
+    if (s.urut === "nama") return (a.judul ?? "").localeCompare(b.judul ?? "");
+    // SEBELUM: a.tanggal.localeCompare -> bisa crash kalau tanggal undefined. SESUDAH: (a.tanggal ?? "")
+    return (a.tanggal ?? "").localeCompare(b.tanggal ?? "");
   });
 }
 

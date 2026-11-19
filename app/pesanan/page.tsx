@@ -1,145 +1,206 @@
-import type { Metadata } from "next";
-import { cookies } from "next/headers";
+"use client";
+
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { pesanan } from "@/data/pesanan";
+import { ambilPesanan, ambilEvents } from "@/data/ambil";
 import { rupiah } from "@/data/events";
 import { batalkanPesanan } from "@/app/actions";
 
-export const metadata: Metadata = { title: "Daftar Pesanan" };
+type PesananRow = any;
 
-export default async function PesananPage() {
-  const namaSaya = (await cookies()).get("nama")?.value ?? "";
-  const totalTiket = pesanan.reduce((a, p) => a + p.jumlah, 0);
-  const pendapatan = pesanan.reduce((a, p) => a + p.total, 0);
+export default function PesananPage() {
+  const [pesanan, setPesanan] = useState<PesananRow[]>([]);
+  const [semuaEvent, setSemuaEvent] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  if (pesanan.length === 0) {
-    return (
-      <div className="overflow-hidden rounded- bg-[#FFFBEB] border-2 border-orange-100 shadow-sm">
-        <div className="bg-gradient-to-r from-[#FFC837] via-[#FFB020] to-[#FF7A18] px-6 py-8 md:py-10 text-center">
-          <div className="mx-auto grid h-20 w-20 place-items-center rounded- bg-[#FFFEF7] border-2 border-amber-200 text-4xl shadow-lg rotate-3">🧾</div>
-          <h1 className="mt-4 text-2xl md:text-3xl font-black text-zinc-900">Daftar Pesanan</h1>
-          <p className="mt-1 text-sm font-bold text-zinc-700/80">Semua pesananmu bakal muncul di sini</p>
-        </div>
-        <div className="p-8 md:p-10 text-center">
-          <p className="text-sm font-bold text-zinc-600">Belum ada pesanan. Pilih event dulu.</p>
-          <Link href="/event" className="mt-6 inline-flex items-center gap-2 rounded-full bg-zinc-900 px-6 py-3 text-sm font-black text-[#FFC837] shadow-lg hover:-translate-y-0.5 transition">
-            Cari Event
-            <span className="grid h-5 w-5 place-items-center rounded-full bg-[#FFC837] text- text-zinc-900">→</span>
-          </Link>
-        </div>
-      </div>
-    );
+  // GABUNGAN - DARI PESANAN 1 + FIX NO. 3:
+  // SEBELUM (Pesanan 2, server): cuma ambilPesanan() dari DB ke-filter cookie -> kalau cookie beda, pesanan ilang, padahal badge Navbar 1
+  // SEBELUM (bug fix no.3): filter lokal pake nomorDB -> nomor lokal (Date.now) beda sama nomor DB, pesanan baru langsung ke-buang
+  // SESUDAH: gabungin DB + localStorage SEMUA, dedupe pake kunci event+nama+email+jumlah+total (BUKAN nomor)
+  // JADI: angka di sini SAMA kaya badge Navbar, gak ada yang ilang, gak ada yang double
+  async function muat() {
+    setLoading(true);
+    const [dariDB, dariEvents] = await Promise.all([
+      ambilPesanan().catch(() => []),
+      ambilEvents().catch(() => []),
+    ]);
+    setSemuaEvent(dariEvents);
+
+    let dariLokal: PesananRow[] = [];
+    try {
+      dariLokal = JSON.parse(localStorage.getItem("pesanan-eventku") || "[]");
+      if (!Array.isArray(dariLokal)) dariLokal = [];
+    } catch { dariLokal = []; }
+
+    // Kunci dedupe: event + nama + email + jumlah + total
+    // Kalau pesanan yang sama udah ada di DB, versi lokal-nya jangan diitung lagi (biar gak double)
+    // Tapi kalau pesanan lokal beneran beda (event / nama / jumlah beda), tetep kepake
+    const kunci = (p: any) => [p.event_id, p.nama, p.email, p.jumlah, p.total].join("|");
+    const kunciDB = new Set((dariDB as any[]).map(kunci));
+    const lokalBaru = dariLokal.filter((p) => !kunciDB.has(kunci(p)));
+
+    const gabung = [...(dariDB as any[]), ...lokalBaru].sort((a, b) => {
+      const ta = new Date(a.dibuat ?? a.created_at ?? 0).getTime();
+      const tb = new Date(b.dibuat ?? b.created_at ?? 0).getTime();
+      return tb - ta;
+    });
+    setPesanan(gabung);
+    setLoading(false);
+  }
+
+  useEffect(() => { muat(); }, []);
+
+  // Kalau ada pesanan baru / batal dari halaman lain, reload otomatis
+  useEffect(() => {
+    const h = () => muat();
+    window.addEventListener("pesanan-berubah", h);
+    window.addEventListener("storage", h);
+    return () => {
+      window.removeEventListener("pesanan-berubah", h);
+      window.removeEventListener("storage", h);
+    };
+  }, []);
+
+  const namaEvent = (p: any) => {
+    // Urutan bener: 1. dari join Supabase p.events.judul (karena di events kolomnya judul)
+    // 2. fallback kalau Supabase lama masih ngirim p.events.nama
+    // 3. fallback cari di semuaEvent
+    if (p.events?.judul) return p.events.judul;
+    if (p.events?.nama) return p.events.nama;
+    const e = semuaEvent.find((x) => x.id === Number(p.event_id));
+    return e?.judul ?? `Event ${p.event_id}`;
+  };
+
+  const totalTiket = pesanan.reduce((a: number, p: any) => a + (Number(p.jumlah) || 0), 0);
+  const totalBayar = pesanan.reduce((a: number, p: any) => a + (Number(p.total) || 0), 0);
+
+  // Hapus juga dari localStorage biar badge Navbar ikut 0 pas dibatalin
+  // Tapi JANGAN hapus pake nomor doang, hapus pake kunci yang sama biar yang di DB + lokal kehapus bareng
+  function batalkanLokal(p: any) {
+    try {
+      const lama = JSON.parse(localStorage.getItem("pesanan-eventku") || "[]");
+      const listLama = Array.isArray(lama) ? lama : [];
+      const kunciTarget = [p.event_id, p.nama, p.email, p.jumlah, p.total].join("|");
+      const sisa = listLama.filter((x: any) => [x.event_id, x.nama, x.email, x.jumlah, x.total].join("|") !== kunciTarget);
+      localStorage.setItem("pesanan-eventku", JSON.stringify(sisa));
+      window.dispatchEvent(new Event("pesanan-berubah"));
+    } catch {}
   }
 
   return (
-    <div className="space-y-5">
-      {/* HEADER BANNER */}
-      <div className="relative overflow-hidden rounded- bg-gradient-to-r from-[#FFC837] via-[#FFB020] to-[#FF7A18] border-2 border-amber-300 p-6 md:p-8 shadow-[0_12px_30px_rgba(255,122,24,0.25)]">
-        <div className="absolute -right-8 -top-10 h-36 w-36 rounded-full bg-white/20" />
-        <div className="absolute -right-2 top-16 h-20 w-20 rounded-full bg-[#FFFEF7]/40" />
-        <div className="relative">
-          <span className="inline-flex rounded-full bg-zinc-900 px-3 py-1.5 text- font-black text-[#FFC837]">🧾 DAFTAR PESANAN</span>
-          <h1 className="mt-3 text-2xl md:text-3xl font-black tracking-tight text-zinc-900">Daftar Pesanan</h1>
-          {namaSaya ? (
-            <p className="mt-1.5 text-sm font-bold text-zinc-800/85">Halo, <span className="font-black text-zinc-900">{namaSaya}</span>! Ini semua pesanan yang tercatat.</p>
-          ) : (
-            <p className="mt-1.5 text-sm font-bold text-zinc-800/85">Ini semua pesanan yang tercatat di EventKu.</p>
-          )}
-        </div>
-      </div>
-
-      {/* STATISTIK */}
-      <div className="grid grid-cols-3 gap-3 md:gap-4">
-        <div className="rounded- bg-[#FFFEF7] border-2 border-orange-100 p-4 md:p-5 text-center shadow-sm hover:-translate-y-1 transition">
-          <p className="text-xl md:text-2xl">📦</p>
-          <p className="mt-1 text-xl md:text-2xl font-black text-zinc-900">{pesanan.length}</p>
-          <p className="text- font-black text-zinc-500">PESANAN</p>
-        </div>
-        <div className="rounded- bg-[#F0FDF4] border-2 border-emerald-100 p-4 md:p-5 text-center shadow-sm hover:-translate-y-1 transition">
-          <p className="text-xl md:text-2xl">🎟️</p>
-          <p className="mt-1 text-xl md:text-2xl font-black text-emerald-700">{totalTiket}</p>
-          <p className="text- font-black text-zinc-500">TIKET</p>
-        </div>
-        <div className="rounded- bg-[#F5F3FF] border-2 border-violet-100 p-4 md:p-5 text-center shadow-sm hover:-translate-y-1 transition">
-          <p className="text-xl md:text-2xl">💰</p>
-          <p className="mt-1 text-sm md:text-2xl font-black text-violet-700 leading-tight">{rupiah(pendapatan)}</p>
-          <p className="text- font-black text-zinc-500">PENDAPATAN</p>
-        </div>
-      </div>
-
-      {/* TABEL DESKTOP */}
-      <div className="hidden md:block overflow-hidden rounded- bg-[#FFFEF7] border-2 border-orange-100 shadow-sm">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="bg-[#FFFBEB] border-b-2 border-orange-100">
-                <th className="p-4 text-left text- font-black tracking-wider text-zinc-500">NOMOR</th>
-                <th className="p-4 text-left text- font-black tracking-wider text-zinc-500">EVENT</th>
-                <th className="p-4 text-left text- font-black tracking-wider text-zinc-500">NAMA</th>
-                <th className="p-4 text-left text- font-black tracking-wider text-zinc-500">JUMLAH</th>
-                <th className="p-4 text-left text- font-black tracking-wider text-zinc-500">TOTAL</th>
-                <th className="p-4 text-left text- font-black tracking-wider text-zinc-500">AKSI</th>
-              </tr>
-            </thead>
-            <tbody>
-              {pesanan.map((p) => {
-                const milikSaya = p.nama === namaSaya && namaSaya !== "";
-                return (
-                  <tr key={p.nomor} className={`border-b border-orange-100 last:border-0 hover:bg-[#FFFBEB]/60 transition ${milikSaya ? "bg-[#DCFCE7]/60" : ""}`}>
-                    <td className="p-4">
-                      <span className={`inline-flex rounded-full px-3 py-1 text- font-black ${milikSaya ? "bg-emerald-500 text-white" : "bg-[#FFF7D6] border border-orange-100 text-zinc-800"}`}>#{p.nomor}</span>
-                    </td>
-                    <td className="p-4 font-bold text-zinc-900">
-                      {p.judul}
-                      {milikSaya && <span className="ml-2 rounded-full bg-emerald-500 px-2.5 py-1 text- font-black text-white">✦ Kamu</span>}
-                    </td>
-                    <td className="p-4 font-medium text-zinc-600">{p.nama}</td>
-                    <td className="p-4">
-                      <span className="inline-flex items-center gap-1 rounded-full bg-violet-100 px-3 py-1 text-xs font-black text-violet-700">🎟️ {p.jumlah} tiket</span>
-                    </td>
-                    <td className="p-4 font-black text-zinc-900">{rupiah(p.total)}</td>
-                    <td className="p-4">
-                      {milikSaya ? (
-                        <form action={batalkanPesanan}>
-                          <input type="hidden" name="nomor" value={p.nomor} />
-                          <button className="rounded-full bg-rose-500 px-4 py-2 text-xs font-black text-white shadow-md hover:bg-rose-600 hover:-translate-y-0.5 transition">Batalkan ✕</button>
-                        </form>
-                      ) : (
-                        <span className="text-xs font-bold text-zinc-400">—</span>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* KARTU MOBILE - biar gak kepotong di HP */}
-      <div className="md:hidden space-y-3">
-        {pesanan.map((p) => {
-          const milikSaya = p.nama === namaSaya && namaSaya !== "";
-          return (
-            <div key={p.nomor} className={`rounded- border-2 p-5 shadow-sm ${milikSaya ? "bg-[#DCFCE7]/60 border-emerald-200" : "bg-[#FFFEF7] border-orange-100"}`}>
-              <div className="flex items-center justify-between">
-                <span className={`rounded-full px-3 py-1 text- font-black ${milikSaya ? "bg-emerald-500 text-white" : "bg-[#FFF7D6] border border-orange-100 text-zinc-800"}`}>#{p.nomor}</span>
-                {milikSaya && <span className="rounded-full bg-emerald-500 px-2.5 py-1 text- font-black text-white">✦ Kamu</span>}
-              </div>
-              <h3 className="mt-3 font-black text-zinc-900 leading-tight">{p.judul}</h3>
-              <p className="mt-1 text-xs font-bold text-zinc-600">👤 {p.nama} • 🎟️ {p.jumlah} tiket</p>
-              <div className="mt-3 flex items-center justify-between">
-                <span className="text- font-black text-zinc-900">{rupiah(p.total)}</span>
-                {milikSaya && (
-                  <form action={batalkanPesanan}>
-                    <input type="hidden" name="nomor" value={p.nomor} />
-                    <button className="rounded-full bg-rose-500 px-4 py-2 text-xs font-black text-white shadow-md">Batalkan ✕</button>
-                  </form>
-                )}
-              </div>
+    <div className="w-full min-h-screen overflow-x-hidden bg-[#120826] text-white" style={{ colorScheme: "dark" }}>
+      {/* SEBELUM (Pesanan 2): max-w-4xl doang -> di screenshot konten ketarik ke kanan + kepotong. SESUDAH: w-full max-w-6xl */}
+      <div className="mx-auto w-full max-w-6xl px-4 py-6 sm:px-6">
+        {/* HEADER */}
+        {/* SEBELUM: rounded- doang (kepotong) -> SESUDAH: rounded- */}
+        <div className="relative overflow-hidden rounded- border border-white/10 bg-[#1E103A]/90 p-6 shadow-xl sm:p-7">
+          {/* SEBELUM: blur- doang (kepotong) -> SESUDAH: blur- */}
+          <div className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-violet-500/25 blur-" />
+          <div className="pointer-events-none absolute -bottom-10 -left-10 h-40 w-40 rounded-full bg-pink-500/25 blur-" />
+          <div className="relative">
+            {/* SEBELUM: text- doang (kepotong) -> SESUDAH: text- */}
+            <span className="inline-flex rounded-full bg-white/10 px-4 py-1.5 text- font-black tracking-widest text-white ring-1 ring-white/20 backdrop-blur">✦ DAFTAR PESANAN • DARI DATABASE</span>
+            {/* SEBELUM: text- doang + sm:text- doang (kepotong) -> SESUDAH: text- + sm:text- */}
+            <h1 className="mt-4 text- font-black leading-tight sm:text-">Daftar Pesanan, <span className="bg-linear-to-r from-amber-300 via-orange-400 to-pink-400 bg-clip-text text-transparent">Aman Tersimpan.</span></h1>
+            <p className="mt-2 text-sm text-white/60">Diambil dari tabel <b className="text-white">pesanan</b> di Supabase + pesanan di perangkat ini. Refresh / restart server pun gak hilang.</p>
+            <div className="mt-4 flex flex-wrap gap-2">
+              {/* ANGKA INI SEKARANG SAMA KAYA BADGE NAVBAR, KARENA SUMBERNYA UDAH DIGABUNG */}
+              {/* SEBELUM: text- doang (kepotong) -> SESUDAH: text- */}
+              <span className="rounded-full bg-white/10 px-4 py-1.5 text- font-black ring-1 ring-white/10">🧾 {pesanan.length} Pesanan</span>
+              <span className="rounded-full bg-white/10 px-4 py-1.5 text- font-black ring-1 ring-white/10">🎟 {totalTiket} Tiket Terpesan</span>
+              <span className="rounded-full bg-linear-to-r from-amber-400/20 to-pink-500/20 px-4 py-1.5 text- font-black text-amber-300 ring-1 ring-amber-400/30">💰 Total {totalBayar === 0 ? "Gratis" : rupiah(totalBayar)}</span>
             </div>
-          );
-        })}
+          </div>
+        </div>
+
+        {loading ? (
+          <div className="mt-6 grid gap-4">
+            {[1, 2].map((i) => (
+              <div key={i} className="animate-pulse rounded- border border-white/10 bg-white/5 p-5">
+                <div className="h-5 w-1/3 rounded-full bg-white/10" />
+                <div className="mt-3 h-4 w-1/2 rounded-full bg-white/10" />
+              </div>
+            ))}
+          </div>
+        ) : pesanan.length === 0 ? (
+          // SEBELUM: rounded- doang (kepotong) -> SESUDAH: rounded-
+          <div className="mt-6 rounded- border border-dashed border-white/20 bg-[#1E103A]/90 p-10 text-center shadow-xl">
+            {/* SEBELUM: bg-gradient-to-br + text- doang -> SESUDAH: bg-linear-to-br + text- */}
+            <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-2xl bg-linear-to-br from-violet-600 via-pink-500 to-orange-500 text- shadow-lg">🧾</div>
+            {/* SEBELUM: text- doang (kepotong) -> SESUDAH: text- */}
+            <p className="mt-4 text- font-black">Belum ada pesanan</p>
+            <p className="mx-auto mt-1 max-w-md text-sm text-white/60">Yuk pesan event pertama kamu, langsung tersimpan ke database!</p>
+            <Link href="/event" className="mt-5 inline-block rounded-full bg-linear-to-r from-amber-400 via-orange-500 to-pink-500 px-7 py-3 text-sm font-black shadow-lg transition hover:scale-[1.03]">🎪 Cari Event →</Link>
+          </div>
+        ) : (
+          <div className="mt-6 space-y-3">
+            {pesanan.map((p: any) => {
+              const nomor = p.nomor ?? p.id;
+              const tanggalPesan = p.dibuat ?? p.created_at;
+              let tglTampil = "";
+              if (tanggalPesan) {
+                const d = new Date(tanggalPesan);
+                if (!isNaN(d.getTime())) tglTampil = d.toLocaleString("id-ID", { day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit" });
+              }
+              return (
+                // SEBELUM: rounded- doang (kepotong) -> SESUDAH: rounded-
+                <div key={`${nomor}-${p.event_id}-${p.nama}-${p.email}`} className="group relative overflow-hidden rounded- border border-white/10 bg-[#1E103A]/90 p-5 shadow-lg transition hover:-translate-y-0.5 hover:border-white/20">
+                  {/* SEBELUM: blur- doang (kepotong) -> SESUDAH: blur- */}
+                  <div className="pointer-events-none absolute -right-8 -top-8 h-24 w-24 rounded-full bg-pink-500/15 blur-" />
+                  <div className="relative flex flex-wrap items-start justify-between gap-4">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        {/* SEBELUM: text- doang (kepotong) -> SESUDAH: text- */}
+                        <span className="rounded-full bg-black/40 px-3 py-1 text- font-black text-amber-300 ring-1 ring-white/15">🧾 PESANAN #{nomor}</span>
+                        {tglTampil && <span className="rounded-full bg-white/10 px-3 py-1 text- font-bold text-white/60 ring-1 ring-white/10">🕒 {tglTampil}</span>}
+                      </div>
+                      {/* SEBELUM: text- doang (kepotong) -> SESUDAH: text- */}
+                      <p className="mt-2.5 text- font-black leading-tight">{namaEvent(p)}</p>
+                      {/* SEBELUM: text- doang (kepotong) -> SESUDAH: text- */}
+                      <p className="mt-1 text- text-white/60">👤 {p.nama} • 📧 {p.email}</p>
+                      {/* SEBELUM: text- doang (kepotong) -> SESUDAH: text- */}
+                      <p className="mt-1 text- text-white/40">🎟 {p.jumlah} tiket • Event ID {p.event_id}</p>
+                    </div>
+                    <div className="shrink-0 text-right">
+                      {/* SEBELUM: text- doang (kepotong) -> SESUDAH: text- */}
+                      <p className="text- font-black text-amber-300">{rupiah(Number(p.total || 0))}</p>
+                      {/* SEBELUM: text- doang (kepotong) -> SESUDAH: text- */}
+                      <p className="mt-0.5 text- font-bold text-white/40">{p.jumlah} x tiket</p>
+                    </div>
+                  </div>
+                  <div className="relative mt-4 flex flex-wrap gap-2 border-t border-white/10 pt-3">
+                    {/* SEBELUM: text- doang (kepotong) -> SESUDAH: text- */}
+                    <Link href={`/event/${p.event_id}`} className="rounded-full border border-white/20 bg-white/10 px-4 py-2 text- font-black transition hover:bg-white/15 hover:text-white">👁 Lihat Event</Link>
+                    <Link href={`/pesan?event=${p.event_id}`} className="rounded-full border border-white/20 bg-white/10 px-4 py-2 text- font-black transition hover:bg-white/15 hover:text-white">➕ Pesan Lagi</Link>
+                    <form action={batalkanPesanan} onSubmit={() => batalkanLokal(p)} className="ml-auto">
+                      <input type="hidden" name="nomor" value={nomor} />
+                      <input type="hidden" name="eventId" value={p.event_id} />
+                      <input type="hidden" name="jumlah" value={p.jumlah} />
+                      {/* SEBELUM: text- doang (kepotong) -> SESUDAH: text- */}
+                      <button type="submit" className="rounded-full bg-red-500/15 px-4 py-2 text- font-black text-red-300 ring-1 ring-red-500/30 transition hover:bg-red-500 hover:text-white">🗑 Batalkan</button>
+                    </form>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {pesanan.length > 0 && (
+          // SEBELUM: rounded- doang (kepotong) -> SESUDAH: rounded-
+          <div className="mt-6 rounded- bg-linear-to-r from-violet-600 via-pink-500 to-orange-500 p-5 shadow-xl">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                {/* SEBELUM: text- doang (kepotong) -> SESUDAH: text- */}
+                <p className="text- font-black">Mau nambah pesanan lagi? 🎉</p>
+                {/* SEBELUM: text- doang (kepotong) -> SESUDAH: text- */}
+                <p className="mt-0.5 text- text-white/85">Jangan sampai kehabisan, event favorit kamu bisa habis kapan aja.</p>
+              </div>
+              <Link href="/event" className="shrink-0 rounded-full bg-[#120826]/85 px-6 py-3 text-center text-sm font-black text-white ring-1 ring-white/25 shadow-lg backdrop-blur transition hover:scale-[1.03]">Cari Event →</Link>
+            </div>
+          </div>
+        )}
+        <div className="h-10" />
       </div>
     </div>
   );
