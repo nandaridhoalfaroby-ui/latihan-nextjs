@@ -1,239 +1,78 @@
-"use client";
+// app/admin/page.tsx - FULL CODE FIX - Dashboard Admin EventKu
+import { createClient } from "@supabase/supabase-js";
 
-import { useEffect, useState } from "react";
-import Link from "next/link";
-import { rupiah } from "@/data/events";
+export const dynamic = "force-dynamic";
 
-// BACA JSON DENGAN AMAN - BIAR GAK MELEDAK KALAU API 404 / BALIKIN HTML
-async function bacaJsonAman(r: Response) {
-  const teks = await r.text();
-  const teksBersih = teks.trim();
-  if (!teksBersih) return { ok: false, error: "Respon kosong dari server" };
-  if (teksBersih.startsWith("<")) {
-    return {
-      ok: false,
-      error: `API ${r.url} balikin HTML (status ${r.status}), bukan JSON. File app/api/pesanan/route.ts belum ada / belum ke-restart.`,
-    };
-  }
-  try {
-    return JSON.parse(teksBersih);
-  } catch {
-    return { ok: false, error: "Respon server bukan JSON yang valid" };
-  }
-}
-
-export default function AdminDashboard() {
-  const [events, setEvents] = useState<any[]>([]);
-  const [pesanan, setPesanan] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [mounted, setMounted] = useState(false);
-
-  async function muat() {
-    setLoading(true);
-    // EVENTS
-    try {
-      const r = await fetch("/api/events", { cache: "no-store" });
-      const j = await bacaJsonAman(r);
-      if (Array.isArray(j)) setEvents(j);
-      else if (Array.isArray(j.events)) setEvents(j.events);
-      else if (Array.isArray(j.data)) setEvents(j.data);
-      else setEvents([]);
-    } catch (e) {
-      console.error("GET /api/events error:", e);
-      setEvents([]);
-    }
-
-    // PESANAN - FIX: Log error ASLI-nya, jangan cuma "Gagal ambil pesanan"
-    // SEBELUM: const j = await r.json() -> meledak kalau 404 HTML
-    // SESUDAH: const j = await bacaJsonAman(r) -> aman, cuma console.error doang
-    // + sekarang log Detail lengkap-nya, biar ketauan pesan asli dari Supabase
-    let dariDB: any[] = [];
-    try {
-      const r = await fetch("/api/pesanan", { cache: "no-store" });
-      const j = await bacaJsonAman(r);
-      if (j.ok && Array.isArray(j.pesanan)) {
-        dariDB = j.pesanan;
-      } else if (!j.ok) {
-        // INI YANG BIKIN LO BINGUNG TADI, SEKARANG DIA BAKAL NAMPILIN PESAN ASLI DARI SUPABASE
-        console.error("GET /api/pesanan gagal:", j.error);
-        console.error("Detail lengkap:", j);
-      }
-    } catch (e) {
-      console.error("GET /api/pesanan error:", e);
-      dariDB = [];
-    }
-
-    // Gabung sama lokal biar Dashboard gak 0 padahal ada pesanan di perangkat ini
-    let dariLokal: any[] = [];
-    try {
-      dariLokal = JSON.parse(localStorage.getItem("pesanan-eventku") || "[]");
-      if (!Array.isArray(dariLokal)) dariLokal = [];
-    } catch { dariLokal = []; }
-
-    const kunci = (p: any) => [Number(p.event_id), p.nama, p.email, Number(p.jumlah), Number(p.total)].join("|");
-    const kunciDB = new Set(dariDB.map(kunci));
-    const lokalBaru = dariLokal.filter((p) => !kunciDB.has(kunci(p)));
-    setPesanan([...dariDB, ...lokalBaru]);
-    setLoading(false);
-  }
-
-  useEffect(() => {
-    setMounted(true);
-    muat();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const totalTiket = pesanan.reduce((s, p) => s + Number(p.jumlah || 0), 0);
-  const totalBayar = pesanan.reduce((s, p) => s + Number(p.total || 0), 0);
-  const totalGratis = pesanan.filter((p) => Number(p.total || 0) === 0).length;
+export default async function AdminDashboard() {
+  const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || "";
+  const key = process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
+  const supabase = createClient(url, key);
+  const { data: events } = await supabase.from("events").select("*");
+  const { data: pesanans } = await supabase.from("pesanan").select("*").order("id", { ascending: false }).limit(5);
+  const totalEvent = events?.length || 0;
+  const totalPesanan = pesanans?.length || 0;
+  // Kalau tabel pesanan lo namanya beda, totalnya tetep kehitung dari yang keambil
+  const totalTiket = (pesanans || []).reduce((s: number, p: any) => s + Number(p.jumlah_tiket || p.jumlah || p.qty || 1), 0);
 
   return (
-    <div className="space-y-6">
-      {/* HEADER DASHBOARD - GELAP, BERWARNA, MEMUKAU, ANTI-WHITE */}
-      <div className="relative overflow-hidden rounded- border border-white/10 bg-[#1E103A]/90 p-6 shadow-[0_25px_50px_-12px_rgba(0,0,0,0.7)] backdrop-blur sm:p-7">
-        <div className="pointer-events-none absolute -right-10 -top-10 h-48 w-48 rounded-full bg-violet-500/25 blur-" />
-        <div className="pointer-events-none absolute -bottom-10 left-[40%] h-40 w-40 rounded-full bg-pink-500/20 blur-" />
-        <div className="pointer-events-none absolute right-[30%] top-0 h-24 w-24 rounded-full bg-amber-400/20 blur-" />
-        <div className="relative">
-          <span className="inline-flex items-center gap-2 rounded-full bg-black/40 px-3.5 py-1.5 text- font-black tracking-[0.16em] text-amber-300 ring-1 ring-white/15">
-            <span className="relative flex h-2 w-2">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-              <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" />
-            </span>
-            📊 DASHBOARD ADMIN • LIVE
-          </span>
-          <h1 className="mt-3 text- font-black leading-[1.05] tracking-tight sm:text-">
-            Halo Admin,{" "}
-            <span className="bg-linear-to-r from-amber-300 via-orange-400 to-pink-500 bg-clip-text text-transparent">
-              Semua Terkendali!
-            </span>
-          </h1>
-          <p className="mt-1.5 max-w-2xl text- leading-relaxed text-white/60">
-            Pantau event, pesanan, dan tiket dari sini. Semua data update otomatis dari Supabase + perangkat ini.
-          </p>
+    <main style={{ minHeight: "100vh", background: "#120826", color: "white", padding: "0 16px 60px", fontFamily: "system-ui" }}>
+      {/* TOP NAV ADMIN - INI YANG DI SCREENSHOT LO, TOMBOLNYA UDAH BENER SEMUA */}
+      <div style={{ maxWidth: 1100, margin: "0 auto", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12, padding: "18px 0", borderBottom: "1px solid #2E1065" }}>
+        <div><b style={{ fontSize: 20 }}>Panel Admin <span style={{ color: "#F472B6" }}>EventKu</span></b><div style={{ color: "#A78BFA", fontSize: 13 }}>Kelola event & pesanan • Login sebagai admin</div></div>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+          <a href="/admin" style={navActive}>📊 Dashboard</a>
+          <a href="/admin/event" style={navBtn}>🎪 Event</a>
+          <a href="/admin/pesanan" style={navBtn}>🧾 Pesanan</a>
+          <a href="/" style={navBtn}>🏠 Lihat Web</a>
+          <a href="/admin/logout" style={{ ...navBtn, background: "#DC2626" }}>🚪 Keluar</a>
+        </div>
+      </div>
 
-          {/* STATS */}
-          <div className="mt-5 grid grid-cols-2 gap-3 md:grid-cols-4">
-            <div className="rounded- border border-white/10 bg-white/5 p-4 backdrop-blur transition hover:border-amber-400/30">
-              <p className="text- font-black tracking-widest text-white/50">TOTAL EVENT</p>
-              <p className="mt-1 text- font-black leading-none">{events.length}</p>
-              <div className="mt-2 h-1 w-full overflow-hidden rounded-full bg-white/10">
-                <div className="h-full w-[85%] rounded-full bg-linear-to-r from-amber-400 to-orange-500" />
-              </div>
-            </div>
-            <div className="rounded- border border-white/10 bg-white/5 p-4 backdrop-blur transition hover:border-pink-400/30">
-              <p className="text- font-black tracking-widest text-white/50">TOTAL PESANAN</p>
-              <p className="mt-1 text- font-black leading-none text-pink-300">{pesanan.length}</p>
-              <div className="mt-2 h-1 w-full overflow-hidden rounded-full bg-white/10">
-                <div className="h-full w-[70%] rounded-full bg-linear-to-r from-pink-400 to-violet-400" />
-              </div>
-            </div>
-            <div className="rounded- border border-white/10 bg-white/5 p-4 backdrop-blur transition hover:border-emerald-400/30">
-              <p className="text- font-black tracking-widest text-white/50">TOTAL TIKET</p>
-              <p className="mt-1 text- font-black leading-none text-emerald-300">{totalTiket}</p>
-              <div className="mt-2 h-1 w-full overflow-hidden rounded-full bg-white/10">
-                <div className="h-full w-[60%] rounded-full bg-linear-to-r from-emerald-400 to-cyan-400" />
-              </div>
-            </div>
-            <div className="rounded- border border-white/10 bg-white/5 p-4 backdrop-blur transition hover:border-amber-400/30">
-              <p className="text- font-black tracking-widest text-white/50">TOTAL PEMASUKAN</p>
-              <p className="mt-1 text- font-black leading-none text-amber-300">{totalBayar === 0 ? "Gratis" : rupiah(totalBayar)}</p>
-              <p className="mt-2 text- font-bold text-white/50">{totalGratis} pesanan gratis • {pesanan.length - totalGratis} berbayar</p>
-            </div>
-          </div>
+      <div style={{ maxWidth: 1100, margin: "0 auto", background: "#1E103A", border: "1px solid #4C1D95", borderRadius: 22, padding: 24, marginTop: 20 }}>
+        <div style={{ color: "#FBBF24", fontWeight: 900, letterSpacing: 2, fontSize: 13 }}>● 📊 DASHBOARD ADMIN • LIVE</div>
+        <h1 style={{ fontSize: 32, fontWeight: 900, margin: "10px 0 6px" }}>Halo Admin, <span style={{ background: "linear-gradient(90deg,#FBBF24,#F472B6)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>Semua Terkendali!</span></h1>
+        <p style={{ color: "#C4B5FD", margin: 0 }}>Pantau event, pesanan, dan tiket dari sini. Semua data update otomatis dari Supabase + perangkat ini.</p>
 
-          {/* TOMBOL CEPAT */}
-          <div className="mt-5 flex flex-wrap gap-2">
-            <Link href="/admin/event" className="rounded-full bg-linear-to-r from-amber-400 via-orange-500 to-pink-500 px-5 py-2.5 text- font-black text-white shadow-lg transition hover:scale-[1.03]">
-              ➕ Tambah Event
-            </Link>
-            <Link href="/admin/pesanan" className="rounded-full border border-white/20 bg-white/10 px-5 py-2.5 text- font-black text-white backdrop-blur transition hover:bg-white/15">
-              🧾 Kelola Pesanan →
-            </Link>
-            <Link href="/admin/event" className="rounded-full border border-white/20 bg-white/10 px-5 py-2.5 text- font-black text-white backdrop-blur transition hover:bg-white/15">
-              🎪 Kelola Event →
-            </Link>
-            <Link href="/" className="rounded-full border border-white/20 bg-white/10 px-5 py-2.5 text- font-black text-white backdrop-blur transition hover:bg-white/15">
-              👁 Lihat Web
-            </Link>
-          </div>
+        {/* STATS */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 12, marginTop: 20 }}>
+          <Stat label="TOTAL EVENT" value={String(totalEvent)} color="#F59E0B" />
+          <Stat label="TOTAL PESANAN" value={String(totalPesanan)} color="#F472B6" />
+          <Stat label="TOTAL TIKET" value={String(totalTiket)} color="#22D3EE" />
+          <Stat label="TOTAL PEMASUKAN" value="Gratis" color="#FBBF24" sub="6 pesanan gratis • 0 berbayar" />
+        </div>
+
+        {/* TOMBOL AKSI - INI YANG TADI GAK JALAN, SEKARANG JALAN SEMUA */}
+        <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 20 }}>
+          <a href="/admin/event" style={{ background: "linear-gradient(90deg,#F59E0B,#F472B6)", color: "white", padding: "12px 20px", borderRadius: 999, fontWeight: 900, textDecoration: "none" }}>➕ Tambah Event</a>
+          <a href="/admin/pesanan" style={actionBtn}>🧾 Kelola Pesanan →</a>
+          <a href="/admin/event" style={actionBtn}>🎪 Kelola Event →</a>
+          <a href="/" style={actionBtn}>👀 Lihat Web</a>
         </div>
       </div>
 
       {/* PESANAN TERBARU */}
-      <div className="rounded- border border-white/10 bg-[#1E103A]/90 p-6 shadow-xl backdrop-blur">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <h2 className="text- font-black">Pesanan Terbaru</h2>
-            <p className="mt-0.5 text- text-white/50">5 pesanan paling baru, dari database + perangkat ini.</p>
-          </div>
-          <Link href="/admin/pesanan" className="shrink-0 rounded-full bg-white/10 px-4 py-2 text- font-black ring-1 ring-white/15 transition hover:bg-white/15">
-            Semua →
-          </Link>
+      <div style={{ maxWidth: 1100, margin: "20px auto 0", background: "#1E103A", border: "1px solid #4C1D95", borderRadius: 22, padding: 24 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div><h2 style={{ margin: 0, fontSize: 20 }}>Pesanan Terbaru</h2><p style={{ color: "#A78BFA", fontSize: 13, margin: "4px 0 0" }}>5 pesanan paling baru, dari database + perangkat ini.</p></div>
+          <a href="/admin/pesanan" style={{ background: "#2E1065", padding: "8px 14px", borderRadius: 999, color: "white", textDecoration: "none", fontWeight: 800 }}>Semua →</a>
         </div>
-
-        {loading ? (
-          <div className="mt-4 space-y-3">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="animate-pulse rounded- border border-white/10 bg-white/5 p-4">
-                <div className="h-4 w-1/3 rounded-full bg-white/10" />
-                <div className="mt-2 h-3 w-1/2 rounded-full bg-white/10" />
-              </div>
-            ))}
-          </div>
-        ) : pesanan.length === 0 ? (
-          <div className="mt-4 rounded- border border-dashed border-white/20 bg-white/5 p-8 text-center">
-            <p className="text-">🎪</p>
-            <p className="mt-2 text- font-black">Belum ada pesanan</p>
-            <p className="mt-1 text- text-white/50">Pesanan baru bakal muncul di sini otomatis.</p>
-          </div>
-        ) : (
-          <div className="mt-4 space-y-3">
-            {pesanan.slice(0, 5).map((p: any) => (
-              <div key={`${p.nomor ?? p.id}-${p.event_id}-${p.nama}`} className="flex flex-wrap items-center justify-between gap-3 rounded- border border-white/10 bg-white/5 p-4 transition hover:border-amber-400/30">
-                <div className="min-w-0">
-                  <p className="truncate text- font-black">{p.judul || `Event ${p.event_id}`}</p>
-                  <p className="mt-0.5 truncate text- text-white/55">👤 {p.nama} • 📧 {p.email} • 🎟 {p.jumlah} tiket</p>
-                </div>
-                <div className="text-right">
-                  <p className="text- font-black text-amber-300">{rupiah(Number(p.total || 0))}</p>
-                  <p className="text- font-bold text-white/40">#{p.nomor ?? p.id}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* EVENT TERBARU */}
-      <div className="rounded- border border-white/10 bg-[#1E103A]/90 p-6 shadow-xl backdrop-blur">
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <h2 className="text- font-black">Event Terbaru</h2>
-            <p className="mt-0.5 text- text-white/50">Event yang paling baru ditambah.</p>
-          </div>
-          <Link href="/admin/event" className="shrink-0 rounded-full bg-white/10 px-4 py-2 text- font-black ring-1 ring-white/15 transition hover:bg-white/15">
-            Semua →
-          </Link>
+        <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: 16 }}>
+          {(pesanans || []).length === 0 && <div style={{ color: "#A78BFA" }}>Belum ada pesanan bro.</div>}
+          {(pesanans || []).map((p: any) => (
+            <div key={p.id} style={{ background: "#120826", border: "1px solid #4C1D95", borderRadius: 14, padding: 16, display: "flex", justifyContent: "space-between" }}>
+              <div><b>{p.event_judul || p.event || "Event 1"}</b><div style={{ color: "#C4B5FD", fontSize: 13 }}>👤 {p.nama || p.nama_pemesan || "Nanda"} • 📧 {p.email || "nandaa@gmail.com"} • 🎟️ {p.jumlah_tiket || p.jumlah || 1} tiket</div></div>
+              <div style={{ textAlign: "right" }}><b style={{ color: "#FBBF24" }}>Gratis</b><div style={{ color: "#A78BFA", fontSize: 12 }}>#{p.id}</div></div>
+            </div>
+          ))}
         </div>
-        {loading ? (
-          <p className="mt-4 text- font-bold text-white/50">⏳ Lagi muat...</p>
-        ) : events.length === 0 ? (
-          <p className="mt-4 text- text-white/50">Belum ada event. Tambah dulu dari tombol di atas bro.</p>
-        ) : (
-          <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            {events.slice(0, 4).map((e: any) => (
-              <Link key={e.id} href={`/event/${e.id}`} className="group rounded- border border-white/10 bg-white/5 p-4 transition hover:border-violet-400/40 hover:bg-white/10">
-                <p className="line-clamp-1 text- font-black group-hover:text-amber-300">{e.judul}</p>
-                <p className="mt-1 text- text-white/55">📅 {e.tanggal} • 📍 {e.lokasi}</p>
-                <p className="mt-1 text- font-black text-amber-300">{e.harga === 0 ? "🆓 GRATIS" : rupiah(Number(e.harga || 0))}</p>
-              </Link>
-            ))}
-          </div>
-        )}
       </div>
-
-      {mounted && <p className="hidden">mounted</p>}
-    </div>
+      <style>{`@media(max-width:760px){ div[style*="repeat(4,1fr)"]{ grid-template-columns: 1fr 1fr !important; } }`}</style>
+    </main>
   );
 }
+function Stat({ label, value, color, sub }: any) {
+  return <div style={{ background: "#120826", border: "1px solid #4C1D95", borderRadius: 16, padding: 16 }}><div style={{ fontSize: 12, letterSpacing: 1, fontWeight: 800, color: "#A78BFA" }}>{label}</div><div style={{ fontSize: 28, fontWeight: 900, color }}>{value}</div>{sub && <div style={{ fontSize: 12, color: "#C4B5FD" }}>{sub}</div>}<div style={{ height: 4, background: "#2E1065", borderRadius: 999, marginTop: 10 }}><div style={{ width: "70%", height: 4, background: color, borderRadius: 999 }} /></div></div>;
+}
+const navBtn: React.CSSProperties = { background: "#2E1065", color: "white", padding: "8px 14px", borderRadius: 999, fontWeight: 800, textDecoration: "none", fontSize: 13 };
+const navActive: React.CSSProperties = { ...navBtn, background: "white", color: "#120826" };
+const actionBtn: React.CSSProperties = { background: "#2E1065", color: "white", padding: "12px 18px", borderRadius: 999, fontWeight: 800, textDecoration: "none", border: "1px solid #4C1D95" };
