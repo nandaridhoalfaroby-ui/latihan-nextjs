@@ -1,221 +1,167 @@
-"use client";
+// app/admin/event/page.tsx
+// Halaman Tambah Event Baru - EventKu
+// Dibuka dari: /admin -> tombol Tambah Event -> ke sini /admin/event
 
-import { useEffect, useMemo, useState } from "react";
-import { rupiah, type Event } from "@/data/events";
-import KartuEvent from "@/components/KartuEvent";
+import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
+import { revalidatePath } from "next/cache";
+import { createClient } from "@supabase/supabase-js";
 
-// BACA JSON AMAN - BIAR GAK MELEDAK KALAU API 404 / BALIKIN HTML
-async function bacaJsonAman(r: Response): Promise<unknown> {
-  const teks = await r.text();
-  const teksBersih = teks.trim();
-  if (!teksBersih) return [];
-  if (teksBersih.startsWith("<")) return [];
-  try {
-    return JSON.parse(teksBersih);
-  } catch {
-    return [];
+// --- Server Action: Simpan Event Baru ke Supabase ---
+async function tambahEvent(formData: FormData) {
+  "use server";
+
+  const judul = String(formData.get("judul") || "").trim();
+  const deskripsi = String(formData.get("deskripsi") || "").trim();
+  const kategori = String(formData.get("kategori") || "Workshop");
+  const tanggal = String(formData.get("tanggal") || "");
+  const lokasi = String(formData.get("lokasi") || "").trim();
+  const harga = Number(formData.get("harga") || 0);
+  const kuota = Number(formData.get("kuota") || 50);
+  const gambar = String(formData.get("gambar") || "").trim() || "https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=800";
+
+  if (!judul || !tanggal || !lokasi) {
+    redirect("/admin/event?error=Judul, tanggal, dan lokasi wajib diisi bro!");
   }
+
+  const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || "";
+  const supabaseKey =
+    process.env.SUPABASE_SECRET_KEY ||
+    process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    process.env.SUPABASE_PUBLISHABLE_KEY ||
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+    "";
+
+  if (!supabaseUrl || !supabaseKey) {
+    redirect("/admin/event?error=Env Supabase belum diisi di Vercel bro!");
+  }
+
+  const supabase = createClient(supabaseUrl, supabaseKey);
+
+  const { error } = await supabase.from("events").insert([
+    {
+      judul,
+      deskripsi,
+      kategori,
+      tanggal,
+      lokasi,
+      harga,
+      kuota,
+      gambar,
+      sisa_kuota: kuota,
+    },
+  ]);
+
+  if (error) {
+    redirect(`/admin/event?error=${encodeURIComponent(error.message)}`);
+  }
+
+  revalidatePath("/");
+  revalidatePath("/admin");
+  revalidatePath("/katalog");
+  redirect("/admin?ok=Event berhasil ditambah bro!");
 }
 
-export default function Katalog() {
-  const [semua, setSemua] = useState<Event[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [cari, setCari] = useState("");
-  const [kategori, setKategori] = useState("Semua");
-  const [pesanSeed, setPesanSeed] = useState("");
-  const [lagiSeed, setLagiSeed] = useState(false);
+// --- Halaman-nya ---
+export default async function AdminTambahEventPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string }>;
+}) {
+  // Cek login: kalau belum login, lempar ke /admin dulu
+  const cookieStore = await cookies();
+  const isLogin =
+    cookieStore.get("eventku_admin")?.value === "1" ||
+    cookieStore.get("admin_session")?.value === "1" ||
+    cookieStore.get("admin")?.value === "1";
 
-  async function load() {
-    setLoading(true);
-    try {
-      const res = await fetch("/api/events", { cache: "no-store" });
-      const j = await bacaJsonAman(res);
-      // API bisa balikin { ok, events: [...] } ATAU [...] langsung
-      if (Array.isArray(j)) setSemua(j as Event[]);
-      else if (j && typeof j === "object" && Array.isArray((j as { events?: unknown }).events)) {
-        setSemua((j as { events: Event[] }).events);
-      } else if (j && typeof j === "object" && Array.isArray((j as { data?: unknown }).data)) {
-        setSemua((j as { data: Event[] }).data);
-      } else {
-        setSemua([]);
-      }
-    } catch {
-      setSemua([]);
-    }
-    setLoading(false);
+  // Kalau lo mau langsung bisa buka tanpa login buat ngetes, hapus 3 baris di bawah ini.
+  // Tapi buat aman, biarin aja: harus login dulu di /admin
+  if (!isLogin) {
+    redirect("/admin");
   }
 
-  useEffect(() => {
-    // FIX LINT: Jangan panggil setState langsung di effect, bungkus di async + cleanup
-    let batal = false;
-    (async () => {
-      if (batal) return;
-      await load();
-    })();
-    return () => {
-      batal = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  async function isiDataContoh() {
-    setLagiSeed(true);
-    setPesanSeed("⏳ Lagi ngisi data ke Supabase...");
-    try {
-      const res = await fetch("/api/seed", { method: "POST" });
-      const d = (await bacaJsonAman(res)) as { error?: string; detail?: unknown; pesan?: string; ok?: boolean };
-      if (!res.ok) {
-        setPesanSeed(`❌ Gagal: ${d.error || "Gak tau"} - ${JSON.stringify(d.detail || "").slice(0, 300)}`);
-      } else {
-        setPesanSeed(`✅ ${d.pesan || "Berhasil isi data contoh!"}`);
-        await load();
-      }
-    } catch {
-      setPesanSeed("❌ Failed to fetch ke Supabase. Cek .env.local + internet lo.");
-    }
-    setLagiSeed(false);
-  }
-
-  const kategoriList = useMemo(() => ["Semua", ...Array.from(new Set(semua.map((e) => e.kategori)))], [semua]);
-  const tampil = useMemo(
-    () =>
-      semua.filter((e) => {
-        const cocokCari =
-          e.judul.toLowerCase().includes(cari.toLowerCase()) ||
-          e.lokasi.toLowerCase().includes(cari.toLowerCase());
-        const cocokKategori = kategori === "Semua" || e.kategori === kategori;
-        return cocokCari && cocokKategori;
-      }),
-    [semua, cari, kategori]
-  );
+  const params = await searchParams;
+  const errorMsg = params.error || "";
 
   return (
-    <div className="w-full bg-[#120826] text-white" style={{ colorScheme: "dark" }}>
-      <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6">
-        <div className="relative overflow-hidden rounded- border border-white/10 bg-[#1E103A]/90 p-7 shadow-xl">
-          <div className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-violet-500/25 blur-" />
-          <div className="pointer-events-none absolute -bottom-10 -left-10 h-40 w-40 rounded-full bg-pink-500/25 blur-" />
-          <div className="relative">
-            <h1 className="text- font-black leading-tight md:text-">
-              Jelajahi Semua{" "}
-              <span className="bg-gradient-to-r from-amber-300 via-orange-400 to-pink-400 bg-clip-text text-transparent">
-                Event Seru.
-              </span>
-            </h1>
-            <p className="mt-2 text-sm text-white/60">Semua event dari Supabase, update real-time.</p>
-            <div className="mt-4 flex flex-wrap gap-2">
-              <span className="rounded-full bg-white/10 px-4 py-1.5 text- font-black ring-1 ring-white/10">
-                ✅ {semua.length} Event Tersedia
-              </span>
-              <span className="rounded-full bg-white/10 px-4 py-1.5 text- font-black ring-1 ring-white/10">
-                ⚡ Update dari Supabase
-              </span>
-            </div>
-            <div className="mt-5 flex flex-col gap-2 sm:flex-row">
-              <input
-                value={cari}
-                onChange={(e) => setCari(e.target.value)}
-                placeholder="🔍 Cari event, lokasi..."
-                autoComplete="off"
-                className="flex-1 rounded-full border border-white/15 bg-[#2A1B52] px-5 py-3 text- font-semibold text-white shadow-[inset_0_0_0_1000px_#2A1B52] outline-none placeholder:text-white/30 focus:border-amber-400 focus:ring-2 focus:ring-amber-400/30 [-webkit-text-fill-color:white]"
-                style={{ colorScheme: "dark" }}
-              />
-              <select
-                value={kategori}
-                onChange={(e) => setKategori(e.target.value)}
-                className="rounded-full border border-white/15 bg-[#2A1B52] px-5 py-3 text- font-black text-white outline-none"
-                style={{ colorScheme: "dark" }}
-              >
-                {kategoriList.map((k) => (
-                  <option key={k} value={k} className="bg-[#2A1B52] text-white">
-                    {k}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-        </div>
+    <main style={{ minHeight: "100vh", background: "#120826", color: "white", padding: "32px 16px", fontFamily: "system-ui" }}>
+      <div style={{ maxWidth: 720, margin: "0 auto" }}>
+        {/* Header */}
+        <a href="/admin" style={{ color: "#FBBF24", textDecoration: "none", fontWeight: 700 }}>← Kembali ke Admin</a>
+        <h1 style={{ fontSize: 36, fontWeight: 900, marginTop: 16, background: "linear-gradient(90deg,#FBBF24,#F472B6,#A78BFA)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>
+          ➕ Tambah Event Baru
+        </h1>
+        <p style={{ color: "#C4B5FD", marginTop: 8 }}>Isi form di bawah, event langsung muncul di Beranda + Katalog.</p>
 
-        <div className="mt-5 flex flex-wrap gap-2">
-          {["Semua", "Workshop", "Olahraga", "Musik", "Bazar", "Lomba"].map((k) => (
-            <button
-              key={k}
-              onClick={() => setKategori(k)}
-              className={`rounded-full px-4 py-2 text- font-black transition ${
-                kategori === k
-                  ? "bg-gradient-to-r from-amber-400 via-orange-500 to-pink-500 text-white shadow-lg"
-                  : "bg-white/10 text-white/70 ring-1 ring-white/10 hover:bg-white/20"
-              }`}
-            >
-              {k === "Semua"
-                ? "🏠 Semua"
-                : k === "Workshop"
-                  ? "💻 Workshop"
-                  : k === "Olahraga"
-                    ? "🏃 Olahraga"
-                    : k === "Musik"
-                      ? "🎵 Musik"
-                      : k === "Bazar"
-                        ? "🛍 Bazar"
-                        : "🏆 Lomba"}
-            </button>
-          ))}
-        </div>
-
-        <p className="mt-5 text- font-bold text-white/40">
-          Menampilkan <b className="text-amber-300">{tampil.length}</b> event
-        </p>
-
-        {loading ? (
-          <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="animate-pulse rounded- border border-white/10 bg-[#1E103A]/90 p-5">
-                <div className="h-36 rounded- bg-white/10" />
-                <div className="mt-4 h-4 w-3/4 rounded bg-white/10" />
-              </div>
-            ))}
-          </div>
-        ) : tampil.length === 0 ? (
-          <div className="mt-4 rounded- border border-dashed border-white/20 bg-[#1E103A]/90 p-10 text-center shadow-xl">
-            <div className="mx-auto flex h-20 w-20 items-center justify-center rounded- bg-gradient-to-br from-violet-600 via-pink-500 to-orange-500 text- shadow-lg">
-              🔍
-            </div>
-            <p className="mt-4 text- font-black">Event tidak ditemukan</p>
-            <p className="mx-auto mt-1 max-w-md text-sm text-white/60">
-              Coba kata kunci atau kategori lain, atau isi data contoh dulu bro, 1 klik aja.
-            </p>
-            {/* INI TOMBOLNYA - KALAU GAK MUNCUL, BERARTI FILE BELUM KE-TIMPA */}
-            <button
-              onClick={isiDataContoh}
-              disabled={lagiSeed}
-              className="mt-5 rounded-full bg-gradient-to-r from-amber-400 via-orange-500 to-pink-500 px-7 py-3.5 text-sm font-black shadow-lg transition hover:scale-[1.03] disabled:opacity-50"
-            >
-              {lagiSeed ? "⏳ Lagi Ngisi..." : "✨ Isi 3 Event Contoh Sekarang"}
-            </button>
-            {pesanSeed && (
-              <p className="mx-auto mt-3 max-w-md rounded-2xl bg-black/30 p-3 text-left text- leading-relaxed text-white/70 ring-1 ring-white/10">
-                {pesanSeed}
-              </p>
-            )}
-            <button
-              onClick={() => {
-                setCari("");
-                setKategori("Semua");
-                load();
-              }}
-              className="mt-3 block mx-auto rounded-full border border-white/20 bg-white/10 px-6 py-2.5 text- font-black transition hover:bg-white hover:text-zinc-900"
-            >
-              Tampilkan Semua Event
-            </button>
-          </div>
-        ) : (
-          <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {tampil.map((e) => (
-              <KartuEvent key={e.id} event={e} />
-            ))}
+        {errorMsg && (
+          <div style={{ marginTop: 20, background: "#7F1D1D", border: "1px solid #F87171", padding: 14, borderRadius: 14 }}>
+            ⚠️ {decodeURIComponent(errorMsg)}
           </div>
         )}
+
+        {/* FORM - INI YANG BIKIN /admin/event JADI BISA DIBUKA */}
+        <form
+          action={tambahEvent}
+          style={{ marginTop: 24, background: "#1E103A", border: "1px solid #4C1D95", borderRadius: 20, padding: 24, display: "flex", flexDirection: "column", gap: 16 }}
+        >
+          <label style={{ display: "flex", flexDirection: "column", gap: 6, fontWeight: 700 }}>
+            Judul Event *
+            <input name="judul" required placeholder="Contoh: Workshop React Dasar" style={{ padding: 12, borderRadius: 12, border: "1px solid #6D28D9", background: "#120826", color: "white", outline: "none" }} />
+          </label>
+
+          <label style={{ display: "flex", flexDirection: "column", gap: 6, fontWeight: 700 }}>
+            Kategori
+            <select name="kategori" style={{ padding: 12, borderRadius: 12, border: "1px solid #6D28D9", background: "#120826", color: "white" }}>
+              <option>Workshop</option>
+              <option>Musik</option>
+              <option>Olahraga</option>
+              <option>Bazar</option>
+              <option>Seminar</option>
+            </select>
+          </label>
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+            <label style={{ display: "flex", flexDirection: "column", gap: 6, fontWeight: 700 }}>
+              Tanggal *
+              <input name="tanggal" type="date" required style={{ padding: 12, borderRadius: 12, border: "1px solid #6D28D9", background: "#120826", color: "white", colorScheme: "dark" }} />
+            </label>
+            <label style={{ display: "flex", flexDirection: "column", gap: 6, fontWeight: 700 }}>
+              Lokasi *
+              <input name="lokasi" required placeholder="Lab Komputer" style={{ padding: 12, borderRadius: 12, border: "1px solid #6D28D9", background: "#120826", color: "white" }} />
+            </label>
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+            <label style={{ display: "flex", flexDirection: "column", gap: 6, fontWeight: 700 }}>
+              Harga (Rp, 0 = Gratis)
+              <input name="harga" type="number" defaultValue={0} min={0} style={{ padding: 12, borderRadius: 12, border: "1px solid #6D28D9", background: "#120826", color: "white" }} />
+            </label>
+            <label style={{ display: "flex", flexDirection: "column", gap: 6, fontWeight: 700 }}>
+              Kuota
+              <input name="kuota" type="number" defaultValue={50} min={1} style={{ padding: 12, borderRadius: 12, border: "1px solid #6D28D9", background: "#120826", color: "white" }} />
+            </label>
+          </div>
+
+          <label style={{ display: "flex", flexDirection: "column", gap: 6, fontWeight: 700 }}>
+            Link Gambar (boleh kosong, nanti pake gambar default)
+            <input name="gambar" placeholder="https://..." style={{ padding: 12, borderRadius: 12, border: "1px solid #6D28D9", background: "#120826", color: "white" }} />
+          </label>
+
+          <label style={{ display: "flex", flexDirection: "column", gap: 6, fontWeight: 700 }}>
+            Deskripsi
+            <textarea name="deskripsi" rows={4} placeholder="Ceritain event-nya bro..." style={{ padding: 12, borderRadius: 12, border: "1px solid #6D28D9", background: "#120826", color: "white", resize: "vertical" }} />
+          </label>
+
+          <button type="submit" style={{ padding: "14px", borderRadius: 14, border: "none", fontWeight: 900, fontSize: 16, cursor: "pointer", color: "white", background: "linear-gradient(90deg,#F59E0B,#F472B6,#8B5CF6)" }}>
+            ✨ Simpan Event → Muncul di Beranda
+          </button>
+        </form>
+
+        <p style={{ marginTop: 16, color: "#A78BFA", fontSize: 13, textAlign: "center" }}>
+          Kalau abis Simpan tapi balik ke /admin dan event belum muncul, klik Refresh (Ctrl + Shift + R) atau buka /seed dulu.
+        </p>
       </div>
-    </div>
+    </main>
   );
 }
