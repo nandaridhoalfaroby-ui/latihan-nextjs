@@ -1,6 +1,6 @@
-// app/admin/event/page.tsx - FIX SERVER ERROR
-// Versi anti-crash: 100% Server Component, tanpa onSubmit / confirm / <style>
-// Tombol Event, Tambah Event, Kelola Event -> semua nyangkut ke sini dan jalan!
+// app/admin/event/page.tsx - FIX FINAL 100% SESUAI TABEL ASLI
+// Tabel asli lo: id, judul, kategori, tanggal, lokasi, harga, kuota, terisi, gambar, deskripsi
+// JANGAN pake title / sisa_kuota / description lagi, itu yang bikin error!
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
@@ -31,7 +31,14 @@ async function tambahEvent(formData: FormData) {
   const gambar = String(formData.get("gambar") || "").trim() || "https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=800";
   if (!judul || !tanggal || !lokasi) redirect("/admin/event?error=Judul, tanggal, lokasi wajib diisi bro!");
   const supabase = getSupabase();
-  const { error } = await supabase.from("events").insert([{ judul, deskripsi, kategori, tanggal, lokasi, harga, kuota, gambar, sisa_kuota: kuota }]);
+
+  // PAKE KOLOM ASLI: judul, kategori, tanggal, lokasi, harga, kuota, terisi, gambar, deskripsi
+  const { error } = await supabase.from("events").insert([{
+    judul, kategori, tanggal, lokasi, harga, kuota,
+    terisi: 0,
+    gambar,
+    deskripsi,
+  }]);
   if (error) redirect(`/admin/event?error=${encodeURIComponent(error.message)}`);
   revalidatePath("/");
   revalidatePath("/admin");
@@ -56,14 +63,13 @@ export default async function AdminEventPage({ searchParams }: { searchParams: P
   const params = await searchParams;
   let list: any[] = [];
   let loadError = "";
-
   try {
     const supabase = getSupabase();
     const { data, error } = await supabase.from("events").select("*").order("tanggal", { ascending: true });
     if (error) loadError = error.message;
     else list = data || [];
   } catch (e: any) {
-    loadError = e?.message || "Gagal ambil data dari Supabase";
+    loadError = e?.message || "Gagal ambil data";
   }
 
   const input: React.CSSProperties = { padding: 12, borderRadius: 12, border: "1px solid #6D28D9", background: "#120826", color: "white", outline: "none", width: "100%", boxSizing: "border-box", colorScheme: "dark" };
@@ -77,16 +83,14 @@ export default async function AdminEventPage({ searchParams }: { searchParams: P
 
         {params.ok && <div style={{ marginTop: 18, background: "#14532D", border: "1px solid #22C55E", padding: 14, borderRadius: 14, fontWeight: 700 }}>✅ {decodeURIComponent(params.ok)}</div>}
         {params.error && <div style={{ marginTop: 18, background: "#7F1D1D", border: "1px solid #F87171", padding: 14, borderRadius: 14, fontWeight: 700 }}>⚠️ {decodeURIComponent(params.error)}</div>}
-        {loadError && <div style={{ marginTop: 18, background: "#7F1D1D", border: "1px solid #F87171", padding: 14, borderRadius: 14, fontWeight: 700 }}>⚠️ Gagal ambil Supabase: {loadError} • Cek Env Vars di Vercel bro!</div>}
+        {loadError && <div style={{ marginTop: 18, background: "#7F1D1D", border: "1px solid #F87171", padding: 14, borderRadius: 14, fontWeight: 700 }}>⚠️ Gagal ambil Supabase: {loadError}</div>}
 
-        {/* LAYOUT: FORM KIRI, DAFTAR KANAN - TANPA <style>, PAKE FLEX BIAR GAK CRASH */}
         <div style={{ display: "flex", gap: 20, marginTop: 22, flexWrap: "wrap", alignItems: "flex-start" }}>
-          {/* FORM TAMBAH */}
           <form action={tambahEvent} style={{ flex: "1 1 340px", maxWidth: 460, background: "#1E103A", border: "1px solid #7C3AED", borderRadius: 22, padding: 22, display: "flex", flexDirection: "column", gap: 14 }}>
             <h2 style={{ fontSize: 22, fontWeight: 900, margin: 0 }}>➕ Tambah Event Baru</h2>
             <p style={{ color: "#A78BFA", fontSize: 13, margin: 0 }}>Isi → Simpan → langsung muncul di Beranda & Katalog.</p>
             <input name="judul" required placeholder="Judul Event *  ex: Workshop React Dasar" style={input} />
-            <select name="kategori" style={input}><option>Workshop</option><option>Musik</option><option>Olahraga</option><option>Bazar</option><option>Seminar</option></select>
+            <select name="kategori" style={input}><option>Workshop</option><option>Musik</option><option>Olahraga</option><option>Bazar</option><option>Lomba</option><option>Seminar</option></select>
             <input name="tanggal" type="date" required style={input} />
             <input name="lokasi" required placeholder="Lokasi *  ex: Lab Komputer" style={input} />
             <input name="harga" type="number" defaultValue={0} min={0} placeholder="Harga Rp (0 = Gratis)" style={input} />
@@ -94,31 +98,33 @@ export default async function AdminEventPage({ searchParams }: { searchParams: P
             <input name="gambar" placeholder="Link Gambar (boleh kosong)" style={input} />
             <textarea name="deskripsi" rows={4} placeholder="Deskripsi event..." style={{ ...input, resize: "vertical" }} />
             <button type="submit" style={{ padding: 14, borderRadius: 14, border: "none", fontWeight: 900, fontSize: 16, cursor: "pointer", color: "white", background: "linear-gradient(90deg,#F59E0B,#F472B6,#8B5CF6)" }}>✨ Simpan Event →</button>
-            <span style={{ fontSize: 12, color: "#A78BFA", textAlign: "center" }}>Harga 0 = Gratis • Kuota otomatis jadi sisa kuota</span>
+            <span style={{ fontSize: 12, color: "#A78BFA", textAlign: "center" }}>Harga 0 = Gratis • Terisi otomatis 0</span>
           </form>
 
-          {/* DAFTAR EVENT */}
           <div style={{ flex: "1 1 380px", display: "flex", flexDirection: "column", gap: 14 }}>
             <h2 style={{ fontSize: 22, fontWeight: 900, margin: 0 }}>📋 Daftar Event ({list.length})</h2>
             {list.length === 0 && <div style={{ background: "#1E103A", border: "1px dashed #7C3AED", borderRadius: 18, padding: 28, textAlign: "center", color: "#C4B5FD" }}>Belum ada event. Isi form di kiri buat nambah event pertama bro!</div>}
-            {list.map((ev: any) => (
-              <div key={ev.id} style={{ background: "#1E103A", border: "1px solid #4C1D95", borderRadius: 18, padding: 16, display: "flex", gap: 14, alignItems: "center", flexWrap: "wrap" }}>
-                <img src={ev.gambar || "https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=200"} alt={ev.judul} style={{ width: 84, height: 84, objectFit: "cover", borderRadius: 14, flexShrink: 0 }} />
-                <div style={{ flex: "1 1 220px", minWidth: 0 }}>
-                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
-                    <b style={{ fontSize: 17 }}>{ev.judul}</b>
-                    <span style={{ background: "#F59E0B", color: "#120826", fontSize: 11, fontWeight: 900, padding: "3px 8px", borderRadius: 999 }}>{ev.kategori}</span>
+            {list.map((ev: any) => {
+              const sisa = Number(ev.kuota || 0) - Number(ev.terisi || 0);
+              const harga = Number(ev.harga || 0);
+              return (
+                <div key={ev.id} style={{ background: "#1E103A", border: "1px solid #4C1D95", borderRadius: 18, padding: 16, display: "flex", gap: 14, alignItems: "center", flexWrap: "wrap" }}>
+                  <img src={ev.gambar || "https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=200"} alt={ev.judul} style={{ width: 84, height: 84, objectFit: "cover", borderRadius: 14, flexShrink: 0 }} />
+                  <div style={{ flex: "1 1 220px", minWidth: 0 }}>
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                      <b style={{ fontSize: 17 }}>{ev.judul || "(Tanpa Judul)"}</b>
+                      <span style={{ background: "#F59E0B", color: "#120826", fontSize: 11, fontWeight: 900, padding: "3px 8px", borderRadius: 999 }}>{ev.kategori || "Event"}</span>
+                    </div>
+                    <div style={{ color: "#C4B5FD", fontSize: 13, marginTop: 4 }}>📅 {ev.tanggal} • 📍 {ev.lokasi} • 🎟️ Sisa {sisa}/{ev.kuota} (Terisi {ev.terisi || 0}) • 💰 {harga === 0 ? "Gratis" : `Rp ${harga.toLocaleString("id-ID")}`}</div>
+                    <div style={{ color: "#A78BFA", fontSize: 12, marginTop: 4 }}>{ev.deskripsi || "Tanpa deskripsi"}</div>
                   </div>
-                  <div style={{ color: "#C4B5FD", fontSize: 13, marginTop: 4 }}>📅 {ev.tanggal} • 📍 {ev.lokasi} • 🎟️ {ev.sisa_kuota ?? ev.kuota}/{ev.kuota} • 💰 {Number(ev.harga) === 0 ? "Gratis" : `Rp ${Number(ev.harga).toLocaleString("id-ID")}`}</div>
-                  <div style={{ color: "#A78BFA", fontSize: 12, marginTop: 4 }}>{ev.deskripsi || "Tanpa deskripsi"}</div>
+                  <form action={hapusEvent}>
+                    <input type="hidden" name="id" value={ev.id} />
+                    <button type="submit" style={{ background: "#7F1D1D", color: "white", border: "1px solid #F87171", padding: "8px 12px", borderRadius: 10, fontWeight: 800, cursor: "pointer", whiteSpace: "nowrap" }}>🗑️ Hapus</button>
+                  </form>
                 </div>
-                {/* HAPUS - TANPA confirm, langsung hapus biar gak crash. Kalau mau aman, pikir dulu sebelum klik Hapus! */}
-                <form action={hapusEvent}>
-                  <input type="hidden" name="id" value={ev.id} />
-                  <button type="submit" style={{ background: "#7F1D1D", color: "white", border: "1px solid #F87171", padding: "8px 12px", borderRadius: 10, fontWeight: 800, cursor: "pointer", whiteSpace: "nowrap" }}>🗑️ Hapus</button>
-                </form>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       </div>
