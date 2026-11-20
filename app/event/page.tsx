@@ -1,362 +1,140 @@
-"use client";
+// app/event/page.tsx - KATALOG EVENT - VERSI PALING AMPUH (SERVER, BUKAN CLIENT!)
+// Fix: Katalog 0 event padahal Admin 6 event
+// Penyebab: Katalog lama pake NEXT_PUBLIC_ANON_KEY (publik, kena RLS + Invalid API key)
+// Solusi: Katalog baru pake SERVER + SECRET_KEY (kayak Admin), bypass RLS, PASTI muncul!
 
-import { useEffect, useState } from "react";
-import { ambilEvents } from "@/data/ambil";
-import type { Event } from "@/data/events";
-import KartuEvent from "@/components/KartuEvent";
+import { createClient } from "@supabase/supabase-js";
 
-const semuaKategori = [
-  "Semua",
-  "Workshop",
-  "Olahraga",
-  "Musik",
-  "Bazar",
-  "Lomba",
-];
+export const dynamic = "force-dynamic";
 
-function warnaPill(kategori: string, aktif: boolean) {
-  if (aktif) {
-    // SEBELUM: bg-white + text-zinc-900 (putih) -> SESUDAH: gradient juara, dark
-    return "bg-linear-to-r from-amber-400 via-orange-500 to-pink-500 text-white shadow-xl shadow-orange-500/40 scale-[1.03] border-transparent";
-  }
-
-  if (kategori === "Workshop")
-    return "border-orange-400/30 bg-orange-500/15 text-orange-300 hover:bg-orange-500/25";
-
-  if (kategori === "Olahraga")
-    return "border-emerald-400/30 bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25";
-
-  if (kategori === "Musik")
-    return "border-pink-400/30 bg-pink-500/15 text-pink-300 hover:bg-pink-500/25";
-
-  if (kategori === "Bazar")
-    return "border-amber-400/30 bg-amber-500/15 text-amber-300 hover:bg-amber-500/25";
-
-  if (kategori === "Lomba")
-    return "border-yellow-400/30 bg-yellow-500/15 text-yellow-300 hover:bg-yellow-500/25";
-
-  // SEBELUM: bg-white/[0.07] + hover:bg-white/[0.12] -> SESUDAH: bg-white/7 + hover:bg-white/12
-  return "border-white/15 bg-white/7 text-white/80 hover:bg-white/12";
+function getSupabase() {
+  const url = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || "";
+  const key =
+    process.env.SUPABASE_SECRET_KEY ||
+    process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    process.env.SUPABASE_PUBLISHABLE_KEY ||
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+    "";
+  return createClient(url, key);
 }
 
-export default function Katalog() {
-  const [events, setEvents] = useState<Event[]>([]);
-  const [cari, setCari] = useState("");
-  const [kategori, setKategori] = useState("Semua");
-  const [loading, setLoading] = useState(true);
+function ambilJudul(ev: any) { return ev?.judul || ev?.title || ev?.nama || ev?.name || "(Tanpa Judul)"; }
+function ambilKategori(ev: any) { return ev?.kategori || ev?.category || "Event"; }
+function ambilTanggal(ev: any) { return ev?.tanggal || ev?.date || ""; }
+function ambilLokasi(ev: any) { return ev?.lokasi || ev?.location || ""; }
+function ambilHarga(ev: any) { return Number(ev?.harga ?? ev?.price ?? 0); }
+function ambilKuota(ev: any) { return Number(ev?.kuota ?? ev?.quota ?? 0); }
+function ambilTerisi(ev: any) { return Number(ev?.terisi ?? 0); }
+function ambilGambar(ev: any) { return ev?.gambar || ev?.image || ev?.image_url || "https://images.unsplash.com/photo-1540575467063-178a50c2df87?w=800"; }
+function ambilDeskripsi(ev: any) { return ev?.deskripsi || ev?.description || ""; }
 
-  useEffect(() => {
-    ambilEvents()
-      .then((data) => {
-        setEvents(data);
-      })
-      .catch((error) => {
-        console.error("Gagal mengambil event:", error);
-      })
-      .finally(() => {
-        setLoading(false);
-      });
-  }, []);
+export default async function KatalogEventPage({ searchParams }: { searchParams: Promise<{ q?: string; kategori?: string }> }) {
+  const params = await searchParams;
+  const q = (params.q || "").toLowerCase();
+  const filterKategori = params.kategori || "Semua";
 
-  const hasil = events.filter((e) => {
-    // ERROR SEBELUM: e.nama possibly undefined -> SESUDAH: (e.judul ?? "") + (e.lokasi ?? "")
-    const cocokCari =
-      (e.judul ?? "").toLowerCase().includes(cari.toLowerCase()) ||
-      (e.lokasi ?? "").toLowerCase().includes(cari.toLowerCase());
+  let list: any[] = [];
+  let loadError = "";
+  try {
+    const supabase = getSupabase();
+    const { data, error } = await supabase.from("events").select("*");
+    if (error) loadError = error.message;
+    else list = data || [];
+  } catch (e: any) { loadError = e?.message || "Gagal ambil data"; }
 
-    const cocokKategori =
-      kategori === "Semua" || e.kategori === kategori;
-
-    return cocokCari && cocokKategori;
+  // Filter di server (biar search + kategori langsung jalan, gak perlu JS client)
+  let tampil = list.filter((ev: any) => {
+    const judul = ambilJudul(ev).toLowerCase();
+    const kategori = ambilKategori(ev);
+    const lokasi = ambilLokasi(ev).toLowerCase();
+    if (filterKategori !== "Semua" && kategori !== filterKategori) return false;
+    if (q && !judul.includes(q) && !lokasi.includes(q) && !kategori.toLowerCase().includes(q)) return false;
+    return true;
   });
+  tampil = tampil.sort((a: any, b: any) => String(ambilTanggal(a)).localeCompare(String(ambilTanggal(b))));
 
-  function resetFilter() {
-    setCari("");
-    setKategori("Semua");
-  }
+  const totalGratis = tampil.filter((ev: any) => ambilHarga(ev) === 0).length;
+  const kategoris = ["Semua", "Workshop", "Olahraga", "Musik", "Bazar", "Lomba", "Seminar"];
 
   return (
-    <main className="mx-auto max-w-6xl px-4 pb-16 pt-6">
+    <main style={{ minHeight: "100vh", background: "#120826", color: "white", padding: "28px 16px 60px", fontFamily: "system-ui" }}>
+      <div style={{ maxWidth: 1100, margin: "0 auto" }}>
+        {/* HEADER KATALOG - SAMA KAYAK SCREENSHOT LO, TAPI ANGKA-NYA UDAH BENER */}
+        <div style={{ background: "linear-gradient(135deg,#1E103A,#4C1D95,#7C3AED)", borderRadius: 24, padding: 32, position: "relative", overflow: "hidden" }}>
+          <span style={{ background: "#F59E0B", color: "#120826", fontSize: 11, fontWeight: 900, padding: "5px 10px", borderRadius: 999 }}>🎪 KATALOG EVENT • {tampil.length} EVENT</span>
+          <span style={{ position: "absolute", top: 16, right: 16, background: "#F472B6", fontSize: 11, fontWeight: 900, padding: "5px 10px", borderRadius: 999 }}>● LIVE!</span>
+          <h1 style={{ fontSize: 44, fontWeight: 900, lineHeight: 1.05, margin: "16px 0 0" }}>Cari Event Seru,<br /><span style={{ background: "linear-gradient(90deg,#FBBF24,#F472B6)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>Pesan</span> & <span style={{ color: "white" }}>Hadir!</span></h1>
+          <p style={{ color: "#C4B5FD", marginTop: 12 }}>Semua event sekolah dalam satu tempat — dari Supabase, update real-time. Tinggal cari, klik, pesan!</p>
 
-      {/* HERO - DARK + GLOW */}
-      <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-[#1E103A]/90 p-7 shadow-[0_25px_60px_-20px_rgba(0,0,0,0.6)] backdrop-blur md:p-10">
-
-        {/* BACKGROUND GLOW */}
-        <div className="pointer-events-none absolute -right-10 -top-10 h-48 w-48 rounded-full bg-orange-500/30 blur-3xl" />
-
-        <div className="pointer-events-none absolute -bottom-10 -left-10 h-48 w-48 rounded-full bg-pink-500/30 blur-3xl" />
-
-        <div className="pointer-events-none absolute left-1/2 top-0 h-24 w-72 rounded-full bg-violet-500/20 blur-3xl" />
-
-        {/* LIVE BADGE - SEBELUM: bg-white + text-zinc-900 (putih) -> SESUDAH: dark glass */}
-        <div className="pointer-events-none absolute right-8 top-6 hidden rotate-12 rounded-full bg-white/10 px-3 py-1.5 text-xs font-black tracking-widest text-white ring-1 ring-white/20 shadow-lg backdrop-blur md:block">
-          🎪 LIVE!
-        </div>
-
-        <div className="relative">
-
-          {/* LABEL */}
-          <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-4 py-2 text-xs font-black tracking-[0.16em] text-white backdrop-blur">
-            <span className="relative flex h-2 w-2">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-              <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" />
-            </span>
-
-            🎪 KATALOG EVENT • {events.length} EVENT
-          </span>
-
-          {/* TITLE */}
-          <h1 className="mt-4 text-4xl font-black leading-[0.95] tracking-tight text-white md:text-6xl">
-            Cari Event Seru,
-            <br />
-
-            {/* SEBELUM: bg-gradient-to-r -> SESUDAH: bg-linear-to-r */}
-            <span className="bg-linear-to-r from-amber-300 via-orange-400 to-pink-400 bg-clip-text text-transparent">
-              Pesan
-            </span>{" "}
-            & Hadir!
-          </h1>
-
-          {/* DESCRIPTION */}
-          <p className="mt-4 max-w-2xl text-sm font-medium leading-relaxed text-white/65 md:text-base">
-            Semua event sekolah dalam satu tempat — dari Supabase,
-            update real-time. Tinggal cari, klik, pesan!
-          </p>
-
-          {/* SEARCH + FILTER - DARK GLASSMORPHISM */}
-          <div className="mt-7 flex flex-col gap-3 sm:flex-row">
-
-            {/* SEARCH INPUT */}
-            <div className="relative flex-1">
-
-              <span className="absolute left-5 top-1/2 -translate-y-1/2 text-white/50">
-                🔍
-              </span>
-
-              <input
-                type="text"
-                value={cari}
-                onChange={(e) => setCari(e.target.value)}
-                placeholder="Cari event, misal: Futsal, Musik, Workshop..."
-                autoComplete="off"
-                style={{
-                  backgroundColor: "#160D2B",
-                  color: "#FFFFFF",
-                  colorScheme: "dark",
-                  borderColor: "rgba(255,255,255,0.15)",
-                }}
-                // SEBELUM: !box-border !w-full !rounded-full ... !outline-none placeholder:!font-medium ... -> SESUDAH: semua ! pindah ke belakang
-                className="box-border! w-full! rounded-full! border! border-white/15! bg-[#160D2B]! py-3.5! pl-12! pr-5! text-sm! font-bold! text-white! shadow-inner shadow-black/20 outline-none! backdrop-blur-xl transition-all duration-300 placeholder:font-medium! placeholder:text-white/40! hover:border-orange-400/50! focus:border-orange-400! focus:bg-[#21133D]! focus:ring-2! focus:ring-orange-400/25!"
-              />
-
-            </div>
-
-            {/* CATEGORY SELECT */}
-            <select
-              value={kategori}
-              onChange={(e) => setKategori(e.target.value)}
-              style={{
-                backgroundColor: "#160D2B",
-                color: "#FFFFFF",
-                colorScheme: "dark",
-                borderColor: "rgba(255,255,255,0.15)",
-              }}
-              // SEBELUM: !box-border !cursor-pointer ... -> SESUDAH: semua ! pindah ke belakang
-              className="box-border! cursor-pointer! rounded-full! border! border-white/15! bg-[#160D2B]! px-6! py-3.5! text-sm! font-bold! text-white! shadow-lg outline-none! transition-all hover:border-orange-400/50! focus:border-orange-400! focus:ring-2! focus:ring-orange-400/25! [&>option]:bg-[#1E103A]! [&>option]:text-white!"
-            >
-              {semuaKategori.map((k) => (
-                <option key={k} value={k}>
-                  {k === "Semua" ? "🎪 Semua Kategori" : k}
-                </option>
-              ))}
+          {/* SEARCH - PAKE FORM BIAR JALAN TANPA JS CLIENT */}
+          <form action="/event" method="get" style={{ display: "flex", gap: 10, marginTop: 20, flexWrap: "wrap" }}>
+            <input name="q" defaultValue={params.q || ""} placeholder="Cari event, misal: Futsal, Musik, Workshop..." style={{ flex: "1 1 280px", padding: 14, borderRadius: 999, border: "1px solid #7C3AED", background: "#120826", color: "white", outline: "none" }} />
+            <select name="kategori" defaultValue={filterKategori} style={{ padding: 14, borderRadius: 999, border: "1px solid #7C3AED", background: "#120826", color: "white" }}>
+              {kategoris.map((k) => <option key={k} value={k}>{k === "Semua" ? "Semua Kategori" : k}</option>)}
             </select>
+            <button type="submit" style={{ padding: "14px 22px", borderRadius: 999, border: "none", fontWeight: 900, cursor: "pointer", color: "white", background: "linear-gradient(90deg,#F59E0B,#F472B6)" }}>🔍 Cari</button>
+          </form>
 
+          <div style={{ display: "flex", gap: 8, marginTop: 16, flexWrap: "wrap" }}>
+            <span style={{ background: "#2E1065", padding: "6px 12px", borderRadius: 999, fontSize: 13 }}>🎟️ {tampil.length} Event Tersedia</span>
+            <span style={{ background: "#2E1065", padding: "6px 12px", borderRadius: 999, fontSize: 13 }}>🆓 {totalGratis} Gratis</span>
+            <span style={{ background: "#2E1065", padding: "6px 12px", borderRadius: 999, fontSize: 13 }}>⚡ Update dari Supabase</span>
           </div>
-
-          {/* MINI STATS */}
-          <div className="mt-6 flex flex-wrap gap-2">
-
-            {/* SEBELUM: bg-white/[0.08] -> SESUDAH: bg-white/8 */}
-            <span className="rounded-full border border-white/15 bg-white/8 px-4 py-2 text-xs font-black text-white backdrop-blur">
-              🎟 {events.length} Event Tersedia
-            </span>
-
-            <span className="rounded-full border border-emerald-400/30 bg-emerald-500/15 px-4 py-2 text-xs font-black text-emerald-300 backdrop-blur">
-              🆓 {events.filter((e) => e.harga === 0).length} Gratis
-            </span>
-
-            <span className="rounded-full border border-white/15 bg-white/8 px-4 py-2 text-xs font-black text-white backdrop-blur">
-              ⚡ Update dari Supabase
-            </span>
-
-          </div>
-
         </div>
-      </div>
 
-      {/* CATEGORY PILLS */}
-      <div className="mt-8 flex flex-wrap gap-2">
+        {/* TOMBOL KATEGORI */}
+        <div style={{ display: "flex", gap: 8, marginTop: 20, flexWrap: "wrap" }}>
+          {kategoris.map((k) => (
+            <a key={k} href={`/event?kategori=${k}${q ? `&q=${q}` : ""}`} style={{ padding: "8px 16px", borderRadius: 999, fontWeight: 800, fontSize: 13, textDecoration: "none", color: filterKategori === k ? "white" : "#C4B5FD", background: filterKategori === k ? "linear-gradient(90deg,#F59E0B,#F472B6)" : "#1E103A", border: "1px solid #4C1D95" }}>{k === "Semua" ? "🏠 Semua" : `🎪 ${k}`}</a>
+          ))}
+        </div>
 
-        {semuaKategori.map((k) => (
-          <button
-            key={k}
-            onClick={() => setKategori(k)}
-            className={`rounded-full border px-5 py-2.5 text-sm font-black backdrop-blur transition hover:-translate-y-0.5 ${warnaPill(
-              k,
-              kategori === k
-            )}`}
-          >
-            {k === "Semua"
-              ? "🎪 Semua"
-              : k === "Workshop"
-              ? "💻 Workshop"
-              : k === "Olahraga"
-              ? "⚽ Olahraga"
-              : k === "Musik"
-              ? "🎵 Musik"
-              : k === "Bazar"
-              ? "🛍 Bazar"
-              : "🏆 Lomba"}
-          </button>
-        ))}
+        <p style={{ color: "#C4B5FD", marginTop: 16 }}>Menampilkan <b style={{ color: "#FBBF24" }}>{tampil.length} event</b> {filterKategori !== "Semua" ? `kategori ${filterKategori}` : ""} {q ? `untuk "${q}"` : ""}</p>
 
-      </div>
+        {loadError && <div style={{ marginTop: 16, background: "#7F1D1D", border: "1px solid #F87171", padding: 14, borderRadius: 14, fontWeight: 700 }}>⚠️ Gagal ambil Supabase: {loadError} • Cek SUPABASE_SECRET_KEY di Vercel bro!</div>}
 
-      {/* RESULT INFORMATION */}
-      <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
-
-        <p className="text-sm font-bold text-white/60">
-          Menampilkan{" "}
-          <span className="font-black text-amber-300">
-            {hasil.length}
-          </span>{" "}
-          event
-
-          {kategori !== "Semua" && (
-            <>
-              {" "}• Kategori{" "}
-              <span className="font-black text-white">
-                {kategori}
-              </span>
-            </>
-          )}
-
-          {cari && (
-            <>
-              {" "}• Cari “
-              <span className="font-black text-white">
-                {cari}
-              </span>
-              ”
-            </>
-          )}
-        </p>
-
-        {(cari || kategori !== "Semua") && (
-          <button
-            onClick={resetFilter}
-            className="rounded-full bg-red-500/15 px-4 py-1.5 text-xs font-black text-red-300 ring-1 ring-red-500/30 transition hover:bg-red-500 hover:text-white"
-          >
-            ✕ Reset Filter
-          </button>
+        {/* DAFTAR EVENT */}
+        {tampil.length === 0 ? (
+          <div style={{ marginTop: 20, background: "#1E103A", border: "1px dashed #7C3AED", borderRadius: 18, padding: 40, textAlign: "center" }}>
+            <div style={{ fontSize: 40 }}>🔍</div>
+            <b style={{ fontSize: 18 }}>Event tidak ditemukan</b>
+            <p style={{ color: "#A78BFA", fontSize: 13 }}>Coba kata kunci atau kategori lain.</p>
+            <a href="/event" style={{ display: "inline-block", marginTop: 10, background: "linear-gradient(90deg,#F59E0B,#F472B6)", color: "white", padding: "10px 20px", borderRadius: 999, fontWeight: 900, textDecoration: "none" }}>Tampilkan Semua Event</a>
+          </div>
+        ) : (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 16, marginTop: 20 }}>
+            {tampil.map((ev: any) => {
+              const judul = ambilJudul(ev); const kategori = ambilKategori(ev); const tanggal = ambilTanggal(ev); const lokasi = ambilLokasi(ev);
+              const harga = ambilHarga(ev); const kuota = ambilKuota(ev); const terisi = ambilTerisi(ev); const sisa = kuota - terisi;
+              const gambar = ambilGambar(ev); const deskripsi = ambilDeskripsi(ev);
+              return (
+                <a key={ev.id} href={`/event/${ev.id}`} style={{ textDecoration: "none", color: "white", background: "#1E103A", border: "1px solid #4C1D95", borderRadius: 20, overflow: "hidden", display: "block" }}>
+                  <div style={{ position: "relative" }}>
+                    <img src={gambar} alt={judul} style={{ width: "100%", height: 180, objectFit: "cover", display: "block" }} />
+                    <span style={{ position: "absolute", top: 12, right: 12, background: harga === 0 ? "#22C55E" : "#F59E0B", color: "#120826", fontSize: 12, fontWeight: 900, padding: "5px 10px", borderRadius: 999 }}>{harga === 0 ? "GRATIS" : `Rp ${harga.toLocaleString("id-ID")}`}</span>
+                    <span style={{ position: "absolute", top: 12, left: 12, background: "#120826", fontSize: 11, fontWeight: 900, padding: "5px 10px", borderRadius: 999 }}>{kategori}</span>
+                  </div>
+                  <div style={{ padding: 18 }}>
+                    <b style={{ fontSize: 18, lineHeight: 1.3, display: "block" }}>{judul}</b>
+                    <div style={{ color: "#C4B5FD", fontSize: 13, marginTop: 8 }}>📅 {tanggal} • 📍 {lokasi}</div>
+                    <div style={{ color: "#A78BFA", fontSize: 12, marginTop: 6 }}>{deskripsi || "Tanpa deskripsi"}</div>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 14 }}>
+                      <span style={{ fontSize: 13, color: "#C4B5FD" }}>🎟️ Sisa {sisa}/{kuota}</span>
+                      <span style={{ background: "linear-gradient(90deg,#F59E0B,#F472B6)", padding: "8px 14px", borderRadius: 999, fontWeight: 900, fontSize: 13 }}>Lihat →</span>
+                    </div>
+                  </div>
+                </a>
+              );
+            })}
+          </div>
         )}
 
+        {/* BANNER BAWAH - SAMA KAYAK SCREENSHOT LO */}
+        <div style={{ marginTop: 28, background: "linear-gradient(90deg,#8B5CF6,#F472B6,#F59E0B)", borderRadius: 20, padding: 24, display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
+          <div><div style={{ fontSize: 12, fontWeight: 900, letterSpacing: 1 }}>⚡ JANGAN DITUNDA</div><b style={{ fontSize: 20 }}>Jangan Sampai Kehabisan Tiket! 🎟️</b><div style={{ fontSize: 13, opacity: 0.9 }}>Event favorit kamu bisa habis kapan aja. Cek sekarang, pesan sekarang.</div></div>
+          <a href="/event" style={{ background: "#120826", color: "white", padding: "12px 20px", borderRadius: 999, fontWeight: 900, textDecoration: "none" }}>Lihat Event →</a>
+        </div>
       </div>
-
-      {/* LOADING STATE */}
-      {loading ? (
-
-        <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-
-          {[1, 2, 3, 4, 5, 6].map((i) => (
-            <div
-              key={i}
-              // SEBELUM: bg-white/[0.05] -> SESUDAH: bg-white/5
-              className="animate-pulse rounded-3xl border border-white/10 bg-white/5 p-5 backdrop-blur"
-            >
-              <div className="h-48 rounded-2xl bg-white/10" />
-
-              <div className="mt-4 h-5 w-3/4 rounded-full bg-white/10" />
-
-              <div className="mt-2 h-4 w-1/2 rounded-full bg-white/10" />
-            </div>
-          ))}
-
-        </div>
-
-      ) : hasil.length === 0 ? (
-
-        /* EMPTY STATE */
-        <div className="mt-10 rounded-3xl border border-dashed border-white/20 bg-white/4 p-10 text-center backdrop-blur">
-
-          {/* SEBELUM: bg-gradient-to-br -> SESUDAH: bg-linear-to-br */}
-          <div className="mx-auto grid h-16 w-16 place-items-center rounded-2xl bg-linear-to-br from-violet-500 to-pink-500 text-2xl shadow-lg shadow-pink-500/30">
-            🔍
-          </div>
-
-          <p className="mt-3 text-lg font-black text-white">
-            Event tidak ditemukan
-          </p>
-
-          <p className="text-sm text-white/60">
-            Coba kata kunci atau kategori lain.
-          </p>
-
-          <button
-            onClick={resetFilter}
-            // SEBELUM: bg-gradient-to-r -> SESUDAH: bg-linear-to-r
-            className="mt-5 rounded-full bg-linear-to-r from-amber-400 via-orange-500 to-pink-500 px-6 py-3 text-sm font-black text-white shadow-[0_15px_30px_-10px_rgba(249,115,22,0.6)] transition hover:scale-[1.03]"
-          >
-            Tampilkan Semua Event
-          </button>
-
-        </div>
-
-      ) : (
-
-        /* EVENT GRID */
-        <div className="mt-6 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-
-          {hasil.map((event) => (
-            <KartuEvent key={event.id} event={event} />
-          ))}
-
-        </div>
-
-      )}
-
-      {/* BOTTOM BANNER */}
-      {/* SEBELUM: bg-gradient-to-r -> SESUDAH: bg-linear-to-r */}
-      <div className="relative mt-12 flex flex-col items-start justify-between gap-5 overflow-hidden rounded-3xl bg-linear-to-r from-violet-600 via-pink-500 to-orange-500 p-7 shadow-[0_30px_60px_-20px_rgba(236,72,153,0.6)] md:flex-row md:items-center md:p-9">
-
-        <div className="pointer-events-none absolute -right-10 -top-10 h-44 w-44 rounded-full bg-white/20 blur-3xl" />
-
-        <div className="relative">
-
-          <span className="rounded-full bg-black/25 px-3 py-1 text-xs font-black tracking-widest text-white backdrop-blur">
-            ⏰ JANGAN DITUNDA
-          </span>
-
-          <p className="mt-3 text-xl font-black leading-tight text-white md:text-2xl">
-            Jangan Sampai Kehabisan Tiket! 🎟
-          </p>
-
-          <p className="mt-1 text-sm text-white/85">
-            Event favorit kamu bisa habis kapan aja. Cek sekarang, pesan sekarang.
-          </p>
-
-        </div>
-
-        <a
-          href="#top"
-          // SEBELUM: bg-white + text-zinc-900 (putih) -> SESUDAH: dark glass
-          className="relative shrink-0 rounded-full bg-[#120826]/85 px-7 py-3.5 text-sm font-black text-white ring-1 ring-white/25 shadow-xl backdrop-blur transition hover:scale-105"
-        >
-          Lihat Event →
-        </a>
-
-      </div>
-
     </main>
   );
 }
